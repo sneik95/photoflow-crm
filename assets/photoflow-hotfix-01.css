@@ -4,6 +4,9 @@
 .shoot-price{display:grid!important;gap:3px;align-content:start;white-space:normal!important}
 .shoot-price>strong{color:#2f7f67;font-size:16px;font-weight:750;line-height:1.05;white-space:nowrap}
 .shoot-price>small{color:#7f8795;font-size:10px;font-weight:550;line-height:1.2;white-space:nowrap}
-@media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}}
+/* Keep the shoot status directly beside the shoot type instead of pushing it to the right edge. */
+.shoot-card-topline{justify-content:flex-start!important;gap:12px!important}
+.shoot-card-topline .shoot-status{margin-left:0!important;flex:0 0 auto}
+@media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}.shoot-card-topline{gap:10px!important}}
 @media (max-width:390px){.bottom-nav .nav-label{display:none!important}.bottom-nav{height:62px}.app-main{padding-bottom:calc(132px + env(safe-area-inset-bottom))!important}}
 @media (max-width:340px){.shoot-price>strong{font-size:15px}.shoot-price>small{font-size:9px}}
