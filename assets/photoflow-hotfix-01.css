@@ -16,8 +16,7 @@
 }
 .day-timeline>button>time{margin-left:24px!important}
 .day-checklist>button>i:first-child{margin-left:28px!important}
-/* iOS keyboard/focus stability: avoid both auto-zoom and horizontal panning.
-   The add form previously overflowed because width:100% inputs used content-box sizing. */
+/* iOS keyboard/focus stability. */
 html,body,#root,.app-shell,.app-main,.day-mode{width:100%;max-width:100%;overflow-x:hidden!important}
 .day-mode *,
 .pf-owned-editor *,
@@ -38,6 +37,22 @@ html,body,#root,.app-shell,.app-main,.day-mode{width:100%;max-width:100%;overflo
 .pf-add-fields{grid-template-columns:minmax(88px,92px) minmax(0,1fr)!important}
 .pf-add-fields>*{min-width:0!important;max-width:100%!important}
 .pf-add-fields.single{grid-template-columns:minmax(0,1fr)!important}
+/* On iPhone Safari the browser may still pan the whole page to a focused field.
+   While typing, pin only the compact add form inside the visual viewport instead. */
+.pf-add-box:focus-within{
+  position:fixed!important;
+  left:12px!important;
+  right:12px!important;
+  top:calc(env(safe-area-inset-top) + 92px)!important;
+  bottom:auto!important;
+  width:auto!important;
+  max-width:none!important;
+  margin:0!important;
+  z-index:10000!important;
+  background:#fbfbfd!important;
+  box-shadow:0 12px 38px rgba(23,25,31,.16)!important;
+}
+.pf-add-box:focus-within .pf-add-fields{width:100%!important}
 .toast{display:none!important}
 @media (max-width:480px){
   .app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}
