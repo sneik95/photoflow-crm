@@ -4,10 +4,10 @@
 .shoot-price{display:grid!important;gap:3px;align-content:start;white-space:normal!important}
 .shoot-price>strong{color:#2f7f67;font-size:16px;font-weight:750;line-height:1.05;white-space:nowrap}
 .shoot-price>small{color:#7f8795;font-size:10px;font-weight:550;line-height:1.2;white-space:nowrap}
-/* Force category + status to hug each other on the left. */
-.shoot-card .shoot-copy .shoot-card-topline{display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;justify-self:start!important;align-self:start!important;gap:10px!important;width:max-content!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:0!important}
-.shoot-card .shoot-copy .shoot-card-topline>.eyebrow{display:inline-flex!important;flex:0 0 auto!important;width:max-content!important;max-width:none!important;margin:0!important;padding:0!important}
-.shoot-card .shoot-copy .shoot-card-topline>.shoot-status{display:inline-flex!important;position:static!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;flex:0 0 auto!important;width:max-content!important;max-width:none!important;margin:0!important;margin-left:0!important;padding-left:12px!important;padding-right:12px!important;transform:none!important;justify-self:auto!important;align-self:center!important}
+/* Force category + status into two compact columns on the left. */
+.shoot-card .shoot-copy .shoot-card-topline{display:grid!important;grid-template-columns:max-content max-content!important;align-items:center!important;justify-content:start!important;justify-items:start!important;column-gap:10px!important;row-gap:0!important;width:max-content!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:0!important}
+.shoot-card .shoot-copy .shoot-card-topline>.eyebrow{display:block!important;grid-column:1!important;grid-row:1!important;position:static!important;float:none!important;flex:none!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;transform:none!important}
+.shoot-card .shoot-copy .shoot-card-topline>.shoot-status{display:inline-flex!important;grid-column:2!important;grid-row:1!important;position:static!important;float:none!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;flex:none!important;width:auto!important;max-width:none!important;margin:0!important;padding:3px 10px!important;transform:none!important;justify-self:start!important;align-self:center!important}
 .day-status-strip{display:none!important}
 .day-timeline>button{display:grid!important;grid-template-columns:120px 22px minmax(0,1fr) 48px!important;column-gap:8px!important;align-items:center!important}
 .day-timeline>button>time{margin-left:24px!important}
