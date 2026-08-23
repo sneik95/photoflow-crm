@@ -16,43 +16,48 @@
 }
 .day-timeline>button>time{margin-left:24px!important}
 .day-checklist>button>i:first-child{margin-left:28px!important}
-/* iOS keyboard/focus stability. */
+
+/* iOS keyboard/focus stability.
+   Keep the editor in normal document flow; never float it over the page. */
 html,body,#root,.app-shell,.app-main,.day-mode{width:100%;max-width:100%;overflow-x:hidden!important}
 .day-mode *,
 .pf-owned-editor *,
 .pf-add-box *{box-sizing:border-box}
-.day-mode input,
-.day-mode textarea,
-.day-mode select,
-.pf-add-box input,
-.pf-add-box textarea,
-.pf-add-box select{
-  font-size:16px!important;
-  -webkit-text-size-adjust:100%;
-  max-width:100%!important;
-  min-width:0!important;
-  transform:none!important;
-}
 .pf-owned-editor,.pf-add-box,.pf-add-fields{width:100%!important;max-width:100%!important;min-width:0!important}
 .pf-add-fields{grid-template-columns:minmax(88px,92px) minmax(0,1fr)!important}
 .pf-add-fields>*{min-width:0!important;max-width:100%!important}
 .pf-add-fields.single{grid-template-columns:minmax(0,1fr)!important}
-/* On iPhone Safari the browser may still pan the whole page to a focused field.
-   While typing, pin only the compact add form inside the visual viewport instead. */
-.pf-add-box:focus-within{
-  position:fixed!important;
-  left:12px!important;
-  right:12px!important;
-  top:calc(env(safe-area-inset-top) + 92px)!important;
-  bottom:auto!important;
-  width:auto!important;
-  max-width:none!important;
-  margin:0!important;
-  z-index:10000!important;
-  background:#fbfbfd!important;
-  box-shadow:0 12px 38px rgba(23,25,31,.16)!important;
+
+/* The JS hotfix injects .pf-add-box input {font-size:15px!important} after this file.
+   Use higher specificity so iOS sees a real 16px control and does not auto-zoom. */
+.day-mode .pf-add-box input,
+.day-mode .pf-add-box textarea,
+.day-mode .pf-add-box select,
+.day-mode input.pf-editor-input,
+.day-mode textarea.pf-editor-input{
+  font-size:16px!important;
+  line-height:1.25!important;
+  -webkit-text-size-adjust:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  transform:none!important;
 }
-.pf-add-box:focus-within .pf-add-fields{width:100%!important}
+
+/* Explicitly neutralize the previous focus-within workaround. */
+.day-mode .pf-add-box:focus-within{
+  position:static!important;
+  inset:auto!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important;
+  width:100%!important;
+  max-width:100%!important;
+  margin-top:12px!important;
+  z-index:auto!important;
+  box-shadow:none!important;
+}
+
 .toast{display:none!important}
 @media (max-width:480px){
   .app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}
