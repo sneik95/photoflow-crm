@@ -43,10 +43,19 @@
     profile: { firstName: 'Кристина', lastName: 'Вениченко', phone: '+7 900 000-00-00', city: 'Новороссийск', email: 'kristina@example.ru', goal: '2500000' }
   });
 
+  const normalizeShoot = (shoot) => {
+    const delivered = shoot?.delivered === true || shoot?.status === 'delivered';
+    return delivered ? { ...shoot, delivered: true, archived: true, status: 'delivered' } : { ...shoot, archived: Boolean(shoot?.archived) };
+  };
+
   const readSnapshot = () => {
     try {
       const parsed = JSON.parse(localStorage.getItem(SNAPSHOT_KEY) || 'null');
-      if (parsed && Array.isArray(parsed.clients) && Array.isArray(parsed.shoots)) return parsed;
+      if (parsed && Array.isArray(parsed.clients) && Array.isArray(parsed.shoots)) {
+        parsed.shoots = parsed.shoots.map(normalizeShoot);
+        writeSnapshot(parsed);
+        return parsed;
+      }
     } catch (_) {}
     return initialSnapshot();
   };
@@ -54,10 +63,20 @@
   const nextId = (items) => Math.max(0, ...items.map((x) => Number(x.id) || 0)) + 1;
   const applyAction = (snapshot, payload) => {
     const action = payload?.action, data = payload?.data || {}, id = Number(payload?.id);
-    const next = { ...snapshot, clients:[...(snapshot.clients||[])], shoots:[...(snapshot.shoots||[])], types:[...(snapshot.types||defaultTypes)], reminders:[...(snapshot.reminders||[5,1,0])], profile:{...(snapshot.profile||initialSnapshot().profile)} };
-    if (action === 'createShoot') { const clean={...data}; delete clean.__offlineId; clean.id=nextId(next.shoots); next.shoots.push(clean); }
+    const next = { ...snapshot, clients:[...(snapshot.clients||[])], shoots:[...(snapshot.shoots||[])].map(normalizeShoot), types:[...(snapshot.types||defaultTypes)], reminders:[...(snapshot.reminders||[5,1,0])], profile:{...(snapshot.profile||initialSnapshot().profile)} };
+    if (action === 'createShoot') { const clean={...data}; delete clean.__offlineId; clean.id=nextId(next.shoots); next.shoots.push(normalizeShoot(clean)); }
     else if (action === 'createClient') { const clean={...data}; delete clean.__offlineId; clean.id=nextId(next.clients); next.clients.push(clean); }
-    else if (action === 'updateShoot' && Number.isFinite(id)) next.shoots=next.shoots.map(s=>Number(s.id)===id?{...s,...data}:s);
+    else if (action === 'updateShoot' && Number.isFinite(id)) {
+      next.shoots=next.shoots.map(s=>{
+        if(Number(s.id)!==id) return s;
+        const merged={...s,...data};
+        const delivered=merged.delivered===true || merged.status==='delivered';
+        const explicitlyReopened=data.delivered===false || data.archived===false || (typeof data.status==='string' && data.status!=='delivered');
+        if(delivered) return {...merged,delivered:true,archived:true,status:'delivered'};
+        if(explicitlyReopened) return {...merged,delivered:false,archived:false};
+        return merged;
+      });
+    }
     else if (action === 'deleteShoot' && Number.isFinite(id)) next.shoots=next.shoots.filter(s=>Number(s.id)!==id);
     else if (action === 'deleteActiveShoots') next.shoots=next.shoots.filter(s=>s.archived||s.delivered||s.status==='delivered');
     else if (action === 'deleteAllShoots') next.shoots=[];
