@@ -7,8 +7,7 @@
 .shoot-card-topline{justify-content:flex-start!important;gap:12px!important}
 .shoot-card-topline .shoot-status{margin-left:0!important;flex:0 0 auto}
 .day-status-strip{display:none!important}
-/* Shoot mode editor alignment. Keep the time readable, but pull the marker and title
-   back to the compact alignment used before the editable controls were added. */
+/* Shoot mode editor alignment. */
 .day-timeline>button{
   display:grid!important;
   grid-template-columns:120px 22px minmax(0,1fr) 48px!important;
@@ -17,8 +16,12 @@
 }
 .day-timeline>button>time{margin-left:24px!important}
 .day-checklist>button>i:first-child{margin-left:28px!important}
-/* iOS Safari auto-zooms focused fields below 16px. Keep all shoot-mode editor
-   controls at 16px so opening the keyboard does not zoom or shift the page. */
+/* iOS keyboard/focus stability: avoid both auto-zoom and horizontal panning.
+   The add form previously overflowed because width:100% inputs used content-box sizing. */
+html,body,#root,.app-shell,.app-main,.day-mode{width:100%;max-width:100%;overflow-x:hidden!important}
+.day-mode *,
+.pf-owned-editor *,
+.pf-add-box *{box-sizing:border-box}
 .day-mode input,
 .day-mode textarea,
 .day-mode select,
@@ -27,8 +30,14 @@
 .pf-add-box select{
   font-size:16px!important;
   -webkit-text-size-adjust:100%;
+  max-width:100%!important;
+  min-width:0!important;
+  transform:none!important;
 }
-html,body{max-width:100%;overflow-x:hidden}
+.pf-owned-editor,.pf-add-box,.pf-add-fields{width:100%!important;max-width:100%!important;min-width:0!important}
+.pf-add-fields{grid-template-columns:minmax(88px,92px) minmax(0,1fr)!important}
+.pf-add-fields>*{min-width:0!important;max-width:100%!important}
+.pf-add-fields.single{grid-template-columns:minmax(0,1fr)!important}
 .toast{display:none!important}
 @media (max-width:480px){
   .app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}
@@ -44,6 +53,7 @@ html,body{max-width:100%;overflow-x:hidden}
   }
   .day-timeline>button>time{margin-left:24px!important}
   .day-checklist>button>i:first-child{margin-left:24px!important}
+  .pf-add-fields{grid-template-columns:minmax(84px,88px) minmax(0,1fr)!important}
 }
 @media (max-width:390px){.bottom-nav .nav-label{display:none!important}.bottom-nav{height:62px}.app-main{padding-bottom:calc(132px + env(safe-area-inset-bottom))!important}}
 @media (max-width:340px){.shoot-price>strong{font-size:15px}.shoot-price>small{font-size:9px}}
