@@ -11,8 +11,10 @@
 .day-status-strip{display:none!important}
 /* Align editable shoot-mode rows with the card's normal inner padding. */
 .day-timeline>button,.day-checklist>button{padding-left:28px!important}
+/* Make timeline read as one compact group: time → marker → title. */
+.day-timeline>button{grid-template-columns:112px 22px minmax(0,1fr) 48px!important;column-gap:8px!important}
 /* Demo build: suppress transient toast banners, including the redundant demo-mode notice. */
 .toast{display:none!important}
-@media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}.shoot-card-topline{gap:10px!important}.day-timeline>button,.day-checklist>button{padding-left:26px!important}}
+@media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}.shoot-card-topline{gap:10px!important}.day-timeline>button,.day-checklist>button{padding-left:26px!important}.day-timeline>button{grid-template-columns:96px 20px minmax(0,1fr) 44px!important;column-gap:7px!important}}
 @media (max-width:390px){.bottom-nav .nav-label{display:none!important}.bottom-nav{height:62px}.app-main{padding-bottom:calc(132px + env(safe-area-inset-bottom))!important}}
 @media (max-width:340px){.shoot-price>strong{font-size:15px}.shoot-price>small{font-size:9px}}
