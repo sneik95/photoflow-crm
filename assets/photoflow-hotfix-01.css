@@ -17,6 +17,18 @@
 }
 .day-timeline>button>time{margin-left:24px!important}
 .day-checklist>button>i:first-child{margin-left:28px!important}
+/* iOS Safari auto-zooms focused fields below 16px. Keep all shoot-mode editor
+   controls at 16px so opening the keyboard does not zoom or shift the page. */
+.day-mode input,
+.day-mode textarea,
+.day-mode select,
+.pf-add-box input,
+.pf-add-box textarea,
+.pf-add-box select{
+  font-size:16px!important;
+  -webkit-text-size-adjust:100%;
+}
+html,body{max-width:100%;overflow-x:hidden}
 .toast{display:none!important}
 @media (max-width:480px){
   .app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}
