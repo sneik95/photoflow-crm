@@ -119,7 +119,7 @@
     const hero = document.querySelector('.shoot-day-hero');
     if (hero) {
       const d = parseDate(hero.querySelector('.shoot-day-copy p')?.textContent);
-      if (d && d < today()) hero.style.display = 'none';
+      hero.style.display = d && d < today() ? 'none' : '';
       const label = hero.querySelector('.shoot-day-metrics > div:first-child span');
       if (label && /выехать\s+в/i.test(label.textContent || '')) label.textContent = 'Выезд';
     }
