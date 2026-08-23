@@ -118,6 +118,19 @@
     return nativeFetch(input, init);
   };
 
+  document.addEventListener('change', (event) => {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (select.getAttribute('aria-label') !== 'Фильтр съёмок по статусу') return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const panel = document.querySelector('.shoot-list-panel');
+        if (panel) panel.scrollIntoView({ block: 'start', behavior: 'auto' });
+        else window.scrollTo({ top: 0, behavior: 'auto' });
+      });
+    });
+  }, true);
+
   const parseDate = (text) => {
     const m = String(text || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
     return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
