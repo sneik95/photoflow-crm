@@ -1,113 +1,19 @@
 (()=>{
 'use strict';
-const SNAPSHOT_KEY='fotocrm:snapshot:v2';
-const DEFAULT_BASE=['Основная камера','Запасная камера','Заряженные аккумуляторы','Чистые карты памяти','Вспышка и синхронизатор'];
-const DEFAULT_WEDDING=['Два комплекта объективов','Пауэрбанк','Дождевик'];
-const DEFAULT_OTHER=['Рефлектор','Салфетка для оптики'];
-const readSnap=()=>{try{return JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'{}')}catch{return{}}};
-const writeSnap=s=>{try{localStorage.setItem(SNAPSHOT_KEY,JSON.stringify(s))}catch{}};
-const fmtDate=iso=>{const d=new Date(iso||'');return Number.isFinite(d.getTime())?d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'}):''};
+const SNAP='fotocrm:snapshot:v2';
+const BASE=['Основная камера','Запасная камера','Заряженные аккумуляторы','Чистые карты памяти','Вспышка и синхронизатор'];
+const WEDDING=['Два комплекта объективов','Пауэрбанк','Дождевик'];
+const OTHER=['Рефлектор','Салфетка для оптики'];
+const read=()=>{try{return JSON.parse(localStorage.getItem(SNAP)||'{}')}catch{return{}}};
+const write=s=>{try{localStorage.setItem(SNAP,JSON.stringify(s))}catch{}};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function mode(){return document.querySelector('.day-mode')}
-function reactHandler(el){
-  if(!el)return null;
-  const keys=Object.keys(el);
-  const propsKey=keys.find(k=>k.startsWith('__reactProps$'));
-  if(propsKey&&typeof el[propsKey]?.onClick==='function')return el[propsKey].onClick;
-  let fiberKey=keys.find(k=>k.startsWith('__reactFiber$'));
-  let fiber=fiberKey?el[fiberKey]:null;
-  for(let i=0;fiber&&i<8;i++,fiber=fiber.return){
-    if(typeof fiber.memoizedProps?.onClick==='function')return fiber.memoizedProps.onClick;
-    if(typeof fiber.pendingProps?.onClick==='function')return fiber.pendingProps.onClick;
-  }
-  return null;
-}
-function invokeReact(el){
-  const fn=reactHandler(el); if(typeof fn!=='function')return false;
-  try{fn({currentTarget:el,target:el,preventDefault(){},stopPropagation(){},nativeEvent:{type:'pointerup'}});return true}catch{return false}
-}
-function getShoot(){
-  const m=mode(); if(!m)return null;
-  const hero=m.querySelector('.day-hero');
-  const name=(hero?.querySelector('h2')?.textContent||'').trim();
-  const date=(hero?.textContent||'').match(/\d{2}\.\d{2}\.\d{4}/)?.[0];
-  const snap=readSnap(),shoots=snap.shoots||[];
-  return shoots.find(s=>String(s.clientName||'').trim()===name&&(!date||fmtDate(s.startAt)===date))||shoots.find(s=>String(s.clientName||'').trim()===name)||null;
-}
-function defaultsFor(shoot){
-  const labels=[...DEFAULT_BASE,...(shoot?.type==='Свадьба'?DEFAULT_WEDDING:DEFAULT_OTHER)];
-  return labels.map((label,i)=>({id:`pf-default-${i}-${label.toLowerCase().replace(/\s+/g,'-')}`,label,done:false}));
-}
-async function ensureEquipmentData(){
-  const shoot=getShoot(); if(!shoot)return null;
-  if(Array.isArray(shoot.equipment)&&shoot.equipment.length)return shoot;
-  const equipment=defaultsFor(shoot),snap=readSnap();
-  snap.shoots=(snap.shoots||[]).map(s=>Number(s.id)===Number(shoot.id)?{...s,equipment}:s);
-  writeSnap(snap);
-  try{await fetch('/api/crm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'updateShoot',id:shoot.id,data:{equipment}})})}catch{}
-  return {...shoot,equipment};
-}
-async function wakeGear(){
-  const m=mode(); if(!m)return;
-  const gear=[...m.querySelectorAll('.day-tabs button')].find(b=>(b.textContent||'').trim()==='Техника');
-  if(!gear?.classList.contains('active'))return;
-  await ensureEquipmentData();
-  const list=m.querySelector('.day-checklist');
-  if(list){
-    list.removeAttribute('data-pf-owned');
-    list.dataset.pfRefresh=String(Date.now());
-  }
-}
-function isCloseButton(target){
-  const btn=target?.closest?.('button'); if(!btn)return null;
-  const m=mode(); if(!m)return null;
-  const modal=m.closest('.modal');
-  return modal&&btn===modal.querySelector('header button[aria-label="Закрыть"]')?btn:null;
-}
-function isModeTab(target){
-  const btn=target?.closest?.('.day-tabs button');
-  return btn&&mode()?.contains(btn)?btn:null;
-}
-let handling=false;
-function handlePointer(e){
-  if(handling)return;
-  const close=isCloseButton(e.target),tab=isModeTab(e.target);
-  if(!close&&!tab)return;
-  handling=true;
-  e.preventDefault();
-  e.stopPropagation();
-  e.stopImmediatePropagation?.();
-  const el=close||tab;
-  const label=(el.textContent||'').trim();
-  const ok=invokeReact(el);
-  if(!ok){try{el.click()}catch{}}
-  if(tab){
-    setTimeout(()=>{
-      const m=mode(); if(!m){handling=false;return}
-      const active=[...m.querySelectorAll('.day-tabs button')].find(b=>(b.textContent||'').trim()===label);
-      if(active&&!active.classList.contains('active'))invokeReact(active);
-      setTimeout(()=>{wakeGear().finally(()=>{handling=false})},25);
-    },20);
-  }else{
-    setTimeout(()=>{
-      const m=mode();
-      if(m){
-        const modal=m.closest('.modal');
-        const btn=modal?.querySelector('header button[aria-label="Закрыть"]');
-        if(btn)invokeReact(btn);
-      }
-      handling=false;
-    },45);
-  }
-}
-function install(){
-  if(document.documentElement.dataset.pfControlsV3==='1')return;
-  document.documentElement.dataset.pfControlsV3='1';
-  document.addEventListener('pointerup',handlePointer,true);
-  document.addEventListener('touchend',e=>{
-    if(typeof PointerEvent!=='undefined')return;
-    handlePointer(e);
-  },{capture:true,passive:false});
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-new MutationObserver(()=>{if(mode())setTimeout(wakeGear,0)}).observe(document.documentElement,{childList:true,subtree:true});
+function shoot(){const m=mode();if(!m)return null;const hero=m.querySelector('.day-hero'),name=(hero?.querySelector('h2')?.textContent||'').trim(),snap=read();return (snap.shoots||[]).find(x=>String(x.clientName||'').trim()===name)||null}
+function defaults(s){return [...BASE,...(s?.type==='Свадьба'?WEDDING:OTHER)].map((label,i)=>({id:`eq-${i}-${Date.now()}`,label,done:false}))}
+async function save(s,equipment){const snap=read();snap.shoots=(snap.shoots||[]).map(x=>Number(x.id)===Number(s.id)?{...x,equipment}:x);write(snap);try{await fetch('/api/crm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'updateShoot',id:s.id,data:{equipment}})})}catch{}}
+function style(){if(document.getElementById('pf-gear-final-style'))return;const st=document.createElement('style');st.id='pf-gear-final-style';st.textContent=`.pf-gear-final{display:grid!important;gap:10px!important}.pf-gear-shell{position:relative;overflow:hidden;border-radius:18px;background:#fff}.pf-gear-actions{position:absolute;right:0;top:0;bottom:0;width:150px;display:grid;grid-template-columns:75px 75px}.pf-gear-actions button{border:0;color:#fff;font-weight:650}.pf-gear-edit{background:#5267ff;border-radius:18px 0 0 18px}.pf-gear-delete{background:#e86c63;border-radius:0 18px 18px 0}.pf-gear-row{position:relative;z-index:2;width:100%;min-height:66px;border:0;background:#fff;display:grid;grid-template-columns:66px 1fr;align-items:center;text-align:left;padding:12px 18px 12px 0;transition:transform .22s cubic-bezier(.2,.8,.2,1);touch-action:pan-y}.pf-gear-check{width:28px;height:28px;margin-left:24px;border:1.5px solid #d4d8e2;border-radius:9px;display:grid;place-items:center}.pf-gear-row.done{opacity:.58}.pf-gear-row.done .pf-gear-check{background:#5267ff;color:#fff}.pf-gear-row.done .pf-gear-label{text-decoration:line-through}.pf-gear-add{display:grid;gap:9px;margin-top:12px}.pf-gear-add input{width:100%;height:44px;box-sizing:border-box;border:1px solid #dce1ea;border-radius:12px;padding:0 11px;font-size:15px}.pf-gear-add button{height:44px;border:0;border-radius:12px;background:#eef0ff;color:#5267ff;font-weight:650;font-size:15px}`;document.head.appendChild(st)}
+function drag(row){let sx=0,sy=0,dx=0,open=false,active=false;row.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;dx=open?-150:0;active=true},{passive:true});row.addEventListener('touchmove',e=>{if(!active)return;const x=e.touches[0].clientX-sx,y=e.touches[0].clientY-sy;if(Math.abs(y)>Math.abs(x)&&Math.abs(y)>8){active=false;return}dx=Math.max(-150,Math.min(0,x+(open?-150:0)));row.style.transform=`translateX(${dx}px)`},{passive:true});row.addEventListener('touchend',()=>{if(!active)return;active=false;open=Math.abs(dx)>=55;row.style.transform=open?'translateX(-150px)':'translateX(0)'})}
+function render(){const m=mode();if(!m)return;const tab=[...m.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Техника');if(!tab?.classList.contains('active'))return;const s=shoot();if(!s)return;let items=Array.isArray(s.equipment)?s.equipment:[];if(!items.length){items=defaults(s);save(s,items)}let box=m.querySelector('.day-checklist');if(!box){box=document.createElement('div');box.className='day-checklist';const tabs=tab.parentElement;tabs?.insertAdjacentElement('afterend',box)}box.style.display='';box.hidden=false;box.className='day-checklist pf-gear-final';const done=items.filter(x=>x.done).length;box.innerHTML=`<div class="checklist-progress"><span>${done} из ${items.length}</span><i><b style="width:${items.length?done/items.length*100:0}%"></b></i></div>${items.map(i=>`<div class="pf-gear-shell" data-id="${esc(i.id)}"><div class="pf-gear-actions"><button class="pf-gear-edit">Изменить</button><button class="pf-gear-delete">Удалить</button></div><button type="button" class="pf-gear-row ${i.done?'done':''}"><span class="pf-gear-check">${i.done?'✓':''}</span><span class="pf-gear-label">${esc(i.label)}</span></button></div>`).join('')}<div class="pf-gear-add"><input type="text" placeholder="Техника или аксессуар"><button type="button">+ Добавить</button></div>`;box.querySelectorAll('.pf-gear-shell').forEach(shell=>{const id=shell.dataset.id,row=shell.querySelector('.pf-gear-row');drag(row);row.onclick=()=>{items=items.map(x=>String(x.id)===id?{...x,done:!x.done}:x);save(s,items);render()};shell.querySelector('.pf-gear-delete').onclick=e=>{e.stopPropagation();items=items.filter(x=>String(x.id)!==id);save(s,items);render()};shell.querySelector('.pf-gear-edit').onclick=e=>{e.stopPropagation();const item=items.find(x=>String(x.id)===id);if(!item)return;const val=prompt('Название',item.label);if(val?.trim()){items=items.map(x=>String(x.id)===id?{...x,label:val.trim()}:x);save(s,items);render()}}});const input=box.querySelector('.pf-gear-add input');box.querySelector('.pf-gear-add button').onclick=()=>{const v=input.value.trim();if(!v)return;items=[...items,{id:`eq-${Date.now()}`,label:v,done:false}];save(s,items);render()}}
+function install(){style();const m=mode();if(!m)return;const tab=[...m.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Техника');if(tab&&!tab.dataset.pfGearFinal){tab.dataset.pfGearFinal='1';tab.addEventListener('click',()=>setTimeout(render,0),false)}render()}
+let q=false;const run=()=>{if(q)return;q=true;requestAnimationFrame(()=>{q=false;install()})};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();document.addEventListener('click',()=>setTimeout(run,0),false);new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true});
 })();
