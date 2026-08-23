@@ -2,6 +2,21 @@
   const SNAPSHOT_KEY = 'fotocrm:snapshot:v2';
   const nativeFetch = window.fetch.bind(window);
 
+  const forceStatusAlignment = () => {
+    let style = document.getElementById('pf-status-align');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'pf-status-align';
+      style.textContent = `
+        .shoot-card-topline{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;width:auto!important}
+        .shoot-card-topline .eyebrow{padding-right:0!important;display:inline-block!important;flex:0 0 auto!important}
+        .shoot-card-topline .shoot-status{position:static!important;inset:auto!important;margin:0!important;transform:none!important;flex:0 0 auto!important}
+      `;
+      document.head.appendChild(style);
+    }
+  };
+  forceStatusAlignment();
+
   const defaultTypes = [
     { name: 'Свадьба', color: '#3659E3', deliveryDays: 120 },
     { name: 'Семейная', color: '#008A68', deliveryDays: 14 },
@@ -82,8 +97,6 @@
     return next;
   };
 
-  // The deployed project is static and has no /api/crm backend. Emulate that endpoint
-  // locally so adding/editing shoots works and survives reloads on the same device.
   window.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input?.url || '';
     const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
@@ -116,6 +129,7 @@
   };
 
   const patch = () => {
+    forceStatusAlignment();
     const hero = document.querySelector('.shoot-day-hero');
     if (hero) {
       const d = parseDate(hero.querySelector('.shoot-day-copy p')?.textContent);
