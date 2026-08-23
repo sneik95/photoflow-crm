@@ -1,4 +1,5 @@
 /* PhotoFlow safe responsive hotfix */
+html,body,#root,.app-shell,.app-main,.page{overflow-anchor:none!important;scroll-behavior:auto!important}
 .app-main{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}
 .shoot-list{padding-bottom:18px}
 .shoot-price{display:grid!important;gap:3px;align-content:start;white-space:normal!important}
@@ -51,6 +52,3 @@ html,body,#root,.app-shell,.app-main,.day-mode{width:100%;max-width:100%;overflo
 @media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}.day-timeline>button{grid-template-columns:120px 22px minmax(0,1fr) 44px!important}.day-timeline>button>time{margin-left:24px!important}.day-timeline .pf-edit-shell .pf-owned-row.timeline>time{margin-left:48px!important}.day-checklist>button>i:first-child{margin-left:24px!important}.day-checklist .pf-edit-shell .pf-owned-row.gear{grid-template-columns:62px minmax(0,1fr)!important;column-gap:10px!important}.day-checklist .pf-edit-shell .pf-owned-row.gear>.pf-check{margin-left:24px!important}.day-mode .day-timeline .pf-add-fields .pf-time{flex-basis:92px!important;width:92px!important;min-width:92px!important;max-width:92px!important}}
 @media (max-width:390px){.bottom-nav .nav-label{display:none!important}.bottom-nav{height:62px}.app-main{padding-bottom:calc(132px + env(safe-area-inset-bottom))!important}.day-mode .day-timeline .pf-add-fields .pf-time{flex-basis:88px!important;width:88px!important;min-width:88px!important;max-width:88px!important}}
 @media (max-width:340px){.shoot-price>strong{font-size:15px}.shoot-price>small{font-size:9px}}
-/* iOS/PWA launch guard: block Safari's saved scroll restoration during first paint. */
-@keyframes pf-launch-unlock{0%,99%{position:fixed;inset:0;width:100%;overflow:hidden}100%{position:static;inset:auto;width:auto;overflow:visible}}
-@supports (-webkit-touch-callout:none){body{animation:pf-launch-unlock .7s step-end 1 both!important}}
