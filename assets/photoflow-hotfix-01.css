@@ -7,10 +7,15 @@
 .shoot-card-topline{justify-content:flex-start!important;gap:12px!important}
 .shoot-card-topline .shoot-status{margin-left:0!important;flex:0 0 auto}
 .day-status-strip{display:none!important}
-/* Shoot mode editor alignment. Parent padding is overridden by the app bundle on iPhone,
-   so move the actual leading controls instead. */
-.day-timeline>button{grid-template-columns:112px 22px minmax(0,1fr) 48px!important;column-gap:8px!important}
-.day-timeline>button>time{margin-left:28px!important}
+/* Shoot mode editor alignment. Keep the time readable, but pull the marker and title
+   back to the compact alignment used before the editable controls were added. */
+.day-timeline>button{
+  display:grid!important;
+  grid-template-columns:120px 22px minmax(0,1fr) 48px!important;
+  column-gap:8px!important;
+  align-items:center!important;
+}
+.day-timeline>button>time{margin-left:24px!important}
 .day-checklist>button>i:first-child{margin-left:28px!important}
 .toast{display:none!important}
 @media (max-width:480px){
@@ -19,7 +24,12 @@
   .shoot-price{max-width:none;text-align:left;justify-self:start}
   .shoot-price>strong{font-size:17px}
   .shoot-card-topline{gap:10px!important}
-  .day-timeline>button{grid-template-columns:96px 20px minmax(0,1fr) 44px!important;column-gap:7px!important}
+  .day-timeline>button{
+    display:grid!important;
+    grid-template-columns:120px 22px minmax(0,1fr) 44px!important;
+    column-gap:8px!important;
+    align-items:center!important;
+  }
   .day-timeline>button>time{margin-left:24px!important}
   .day-checklist>button>i:first-child{margin-left:24px!important}
 }
