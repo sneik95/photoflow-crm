@@ -9,6 +9,7 @@
 .day-status-strip{display:none!important}
 .day-timeline>button{display:grid!important;grid-template-columns:120px 22px minmax(0,1fr) 48px!important;column-gap:8px!important;align-items:center!important}
 .day-timeline>button>time{margin-left:24px!important}
+.day-timeline .pf-edit-swipe-shell .pf-owned-row.timeline>time{margin-left:24px!important}
 .day-checklist>button>i:first-child{margin-left:28px!important}
 html,body,#root,.app-shell,.app-main,.day-mode{width:100%;max-width:100%;overflow-x:hidden!important}
 .day-mode *,.pf-owned-editor *,.pf-add-box *{box-sizing:border-box}
@@ -33,6 +34,6 @@ html,body,#root,.app-shell,.app-main,.day-mode{width:100%;max-width:100%;overflo
 .day-mode .pf-add-box .pf-add-btn *{display:inline!important;white-space:nowrap!important;line-height:1!important}
 .day-mode .pf-add-box:focus-within{position:static!important;inset:auto!important;width:100%!important;max-width:100%!important;margin:0!important;z-index:auto!important;box-shadow:none!important}
 .toast{display:none!important}
-@media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}.shoot-card-topline{gap:10px!important}.day-timeline>button{grid-template-columns:120px 22px minmax(0,1fr) 44px!important}.day-timeline>button>time{margin-left:24px!important}.day-checklist>button>i:first-child{margin-left:24px!important}.day-mode .day-timeline .pf-add-fields .pf-time{flex-basis:92px!important;width:92px!important;min-width:92px!important;max-width:92px!important}}
+@media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}.shoot-card-topline{gap:10px!important}.day-timeline>button{grid-template-columns:120px 22px minmax(0,1fr) 44px!important}.day-timeline>button>time{margin-left:24px!important}.day-timeline .pf-edit-swipe-shell .pf-owned-row.timeline>time{margin-left:24px!important}.day-checklist>button>i:first-child{margin-left:24px!important}.day-mode .day-timeline .pf-add-fields .pf-time{flex-basis:92px!important;width:92px!important;min-width:92px!important;max-width:92px!important}}
 @media (max-width:390px){.bottom-nav .nav-label{display:none!important}.bottom-nav{height:62px}.app-main{padding-bottom:calc(132px + env(safe-area-inset-bottom))!important}.day-mode .day-timeline .pf-add-fields .pf-time{flex-basis:88px!important;width:88px!important;min-width:88px!important;max-width:88px!important}}
 @media (max-width:340px){.shoot-price>strong{font-size:15px}.shoot-price>small{font-size:9px}}
