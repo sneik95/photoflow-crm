@@ -1,1 +1,1 @@
-(()=>{const load=src=>{const s=document.createElement('script');s.src=src;s.defer=true;document.head.appendChild(s)};load('/assets/photoflow-base-6ca.js?v=20260823-1');load('/assets/photoflow-controls-v1.js?v=20260823-1')})();
+(()=>{const load=src=>{const s=document.createElement('script');s.src=src;s.async=false;document.head.appendChild(s)};const v='20260823-2';load('/assets/photoflow-base-6ca.js?v='+v);load('/assets/photoflow-controls-v1.js?v='+v)})();
