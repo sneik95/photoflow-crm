@@ -1,4 +1,5 @@
 /* PhotoFlow safe responsive hotfix */
+html,body,#root,.app-shell,.app-main,.page{overflow-anchor:none!important;scroll-behavior:auto!important}
 .app-main{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}
 .shoot-list{padding-bottom:18px}
 .shoot-price{display:grid!important;gap:3px;align-content:start;white-space:normal!important}
