@@ -124,7 +124,9 @@
       .shoot-card-topline{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;width:auto!important}
       .shoot-card-topline .eyebrow{padding-right:0!important;display:inline-block!important;flex:0 0 auto!important}
       .shoot-card-topline .shoot-status{position:static!important;inset:auto!important;margin:0!important;transform:none!important;flex:0 0 auto!important}
-      .pf-archive-empty{padding:36px 18px;text-align:center;color:#7f8795;font-size:16px}
+      .pf-archive-empty{min-height:330px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:44px 24px;text-align:center;background:#fbfaf7}
+      .pf-archive-empty strong{display:block;color:#17191f;font-size:18px;font-weight:750;line-height:1.25;margin:0 0 12px}
+      .pf-archive-empty span{display:block;max-width:310px;color:#8a92a1;font-size:16px;font-weight:450;line-height:1.45}
     `;
     document.head.appendChild(style);
   };
@@ -174,7 +176,7 @@
       if (!empty) {
         empty = document.createElement('div');
         empty.className = 'pf-archive-empty';
-        empty.textContent = 'Архив пока пуст';
+        empty.innerHTML = '<strong>Съёмки не найдены</strong><span>В архиве пока нет сданных съёмок.</span>';
         list.appendChild(empty);
       }
     } else if (empty) {
