@@ -9,8 +9,10 @@
 .shoot-card-topline .shoot-status{margin-left:0!important;flex:0 0 auto}
 /* Remove the redundant 1–5 project status strip in shoot mode. */
 .day-status-strip{display:none!important}
+/* Align editable shoot-mode rows with the card's normal inner padding. */
+.day-timeline>button,.day-checklist>button{padding-left:28px!important}
 /* Demo build: suppress transient toast banners, including the redundant demo-mode notice. */
 .toast{display:none!important}
-@media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}.shoot-card-topline{gap:10px!important}}
+@media (max-width:480px){.app-main{padding-bottom:calc(146px + env(safe-area-inset-bottom))!important}.shoot-card{padding-bottom:22px}.shoot-price{max-width:none;text-align:left;justify-self:start}.shoot-price>strong{font-size:17px}.shoot-card-topline{gap:10px!important}.day-timeline>button,.day-checklist>button{padding-left:26px!important}}
 @media (max-width:390px){.bottom-nav .nav-label{display:none!important}.bottom-nav{height:62px}.app-main{padding-bottom:calc(132px + env(safe-area-inset-bottom))!important}}
 @media (max-width:340px){.shoot-price>strong{font-size:15px}.shoot-price>small{font-size:9px}}
