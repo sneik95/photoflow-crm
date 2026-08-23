@@ -2,22 +2,6 @@
   const SNAPSHOT_KEY = 'fotocrm:snapshot:v2';
   const nativeFetch = window.fetch.bind(window);
 
-  const forceStatusAlignment = () => {
-    let style = document.getElementById('pf-status-align');
-    if (!style) {
-      style = document.createElement('style');
-      style.id = 'pf-status-align';
-      style.textContent = `
-        .shoot-card-topline{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;width:auto!important}
-        .shoot-card-topline .eyebrow{padding-right:0!important;display:inline-block!important;flex:0 0 auto!important}
-        .shoot-card-topline .shoot-status{position:static!important;inset:auto!important;margin:0!important;transform:none!important;flex:0 0 auto!important}
-        html,body{overflow-anchor:none!important}
-      `;
-      document.head.appendChild(style);
-    }
-  };
-  forceStatusAlignment();
-
   const defaultTypes = [
     { name: 'Свадьба', color: '#3659E3', deliveryDays: 120 },
     { name: 'Семейная', color: '#008A68', deliveryDays: 14 },
@@ -44,8 +28,14 @@
   });
 
   const normalizeShoot = (shoot) => {
-    const delivered = shoot?.delivered === true || shoot?.status === 'delivered';
-    return delivered ? { ...shoot, delivered: true, archived: true, status: 'delivered' } : { ...shoot, archived: Boolean(shoot?.archived) };
+    const delivered = shoot?.delivered === true || shoot?.status === 'delivered' || shoot?.archived === true;
+    return delivered
+      ? { ...shoot, delivered: true, archived: true, status: 'delivered' }
+      : { ...shoot, delivered: false, archived: false };
+  };
+
+  const writeSnapshot = (snapshot) => {
+    try { localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot)); } catch (_) {}
   };
 
   const readSnapshot = () => {
@@ -59,69 +49,222 @@
     } catch (_) {}
     return initialSnapshot();
   };
-  const writeSnapshot = (snapshot) => { try { localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot)); } catch (_) {} };
-  const nextId = (items) => Math.max(0, ...items.map((x) => Number(x.id) || 0)) + 1;
+
+  const nextId = (items) => Math.max(0, ...items.map(x => Number(x.id) || 0)) + 1;
+
   const applyAction = (snapshot, payload) => {
-    const action = payload?.action, data = payload?.data || {}, id = Number(payload?.id);
-    const next = { ...snapshot, clients:[...(snapshot.clients||[])], shoots:[...(snapshot.shoots||[])].map(normalizeShoot), types:[...(snapshot.types||defaultTypes)], reminders:[...(snapshot.reminders||[5,1,0])], profile:{...(snapshot.profile||initialSnapshot().profile)} };
-    if (action === 'createShoot') { const clean={...data}; delete clean.__offlineId; clean.id=nextId(next.shoots); next.shoots.push(normalizeShoot(clean)); }
-    else if (action === 'createClient') { const clean={...data}; delete clean.__offlineId; clean.id=nextId(next.clients); next.clients.push(clean); }
-    else if (action === 'updateShoot' && Number.isFinite(id)) {
-      next.shoots=next.shoots.map(s=>{
-        if(Number(s.id)!==id) return s;
-        const merged={...s,...data};
-        const delivered=merged.delivered===true || merged.status==='delivered';
-        const explicitlyReopened=data.delivered===false || data.archived===false || (typeof data.status==='string' && data.status!=='delivered');
-        if(delivered) return {...merged,delivered:true,archived:true,status:'delivered'};
-        if(explicitlyReopened) return {...merged,delivered:false,archived:false};
+    const action = payload?.action;
+    const data = payload?.data || {};
+    const id = Number(payload?.id);
+    const next = {
+      ...snapshot,
+      clients: [...(snapshot.clients || [])],
+      shoots: [...(snapshot.shoots || [])].map(normalizeShoot),
+      types: [...(snapshot.types || defaultTypes)],
+      reminders: [...(snapshot.reminders || [5, 1, 0])],
+      profile: { ...(snapshot.profile || initialSnapshot().profile) }
+    };
+
+    if (action === 'createShoot') {
+      const clean = { ...data };
+      delete clean.__offlineId;
+      clean.id = nextId(next.shoots);
+      next.shoots.push(normalizeShoot(clean));
+    } else if (action === 'createClient') {
+      const clean = { ...data };
+      delete clean.__offlineId;
+      clean.id = nextId(next.clients);
+      next.clients.push(clean);
+    } else if (action === 'updateShoot' && Number.isFinite(id)) {
+      next.shoots = next.shoots.map(shoot => {
+        if (Number(shoot.id) !== id) return shoot;
+        const merged = { ...shoot, ...data };
+        const delivered = data.delivered === true || data.archived === true || data.status === 'delivered' || merged.delivered === true;
+        const reopened = data.delivered === false || data.archived === false || (typeof data.status === 'string' && data.status !== 'delivered');
+        if (reopened) return { ...merged, delivered: false, archived: false, status: data.status || 'processing' };
+        if (delivered) return { ...merged, delivered: true, archived: true, status: 'delivered' };
         return merged;
       });
+    } else if (action === 'deleteShoot' && Number.isFinite(id)) {
+      next.shoots = next.shoots.filter(shoot => Number(shoot.id) !== id);
+    } else if (action === 'deleteActiveShoots') {
+      next.shoots = next.shoots.filter(shoot => shoot.delivered || shoot.archived || shoot.status === 'delivered');
+    } else if (action === 'deleteAllShoots') {
+      next.shoots = [];
+    } else if (action === 'savePreferences') {
+      if (data.profile) next.profile = { ...data.profile };
+      if (data.types) next.types = [...data.types];
+      if (data.reminders) next.reminders = [...data.reminders];
     }
-    else if (action === 'deleteShoot' && Number.isFinite(id)) next.shoots=next.shoots.filter(s=>Number(s.id)!==id);
-    else if (action === 'deleteActiveShoots') next.shoots=next.shoots.filter(s=>s.archived||s.delivered||s.status==='delivered');
-    else if (action === 'deleteAllShoots') next.shoots=[];
-    else if (action === 'savePreferences') { if(data.profile)next.profile={...data.profile}; if(data.types)next.types=[...data.types]; if(data.reminders)next.reminders=[...data.reminders]; }
-    writeSnapshot(next); return next;
+
+    writeSnapshot(next);
+    return next;
   };
 
-  window.fetch = async (input, init={}) => {
-    const url=typeof input==='string'?input:input?.url||'', method=String(init?.method||(typeof input!=='string'?input?.method:'')||'GET').toUpperCase();
-    if ((url==='/api/crm'||url.endsWith('/api/crm'))&&method==='POST') {
-      try { const snapshot=applyAction(readSnapshot(),JSON.parse(init?.body||'{}')); return new Response(JSON.stringify(snapshot),{status:200,headers:{'content-type':'application/json; charset=utf-8'}}); }
-      catch(error){ return new Response(JSON.stringify({error:error instanceof Error?error.message:'Ошибка сохранения'}),{status:500,headers:{'content-type':'application/json; charset=utf-8'}}); }
+  window.fetch = async (input, init = {}) => {
+    const url = typeof input === 'string' ? input : input?.url || '';
+    const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
+    if ((url === '/api/crm' || url.endsWith('/api/crm')) && method === 'POST') {
+      try {
+        const payload = JSON.parse(init?.body || '{}');
+        const snapshot = applyAction(readSnapshot(), payload);
+        return new Response(JSON.stringify(snapshot), { status: 200, headers: { 'content-type': 'application/json; charset=utf-8' } });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Ошибка сохранения' }), { status: 500, headers: { 'content-type': 'application/json; charset=utf-8' } });
+      }
     }
-    return nativeFetch(input,init);
+    return nativeFetch(input, init);
   };
 
-  const isStatusFilter = (el) => el instanceof HTMLSelectElement && (el.getAttribute('aria-label') === 'Фильтр съёмок по статусу' || [...el.options].some(o => /архив/i.test(o.textContent||'')));
-  let filterAnchorY = null;
-  const rememberFilterAnchor = (el) => {
-    if (!isStatusFilter(el)) return;
-    const panel = el.closest('.shoot-list-panel') || document.querySelector('.shoot-list-panel');
-    filterAnchorY = panel ? Math.max(0, window.scrollY + panel.getBoundingClientRect().top - 12) : 0;
+  const ensureStyles = () => {
+    if (document.getElementById('pf-hotfix-style')) return;
+    const style = document.createElement('style');
+    style.id = 'pf-hotfix-style';
+    style.textContent = `
+      .shoot-card-topline{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;width:auto!important}
+      .shoot-card-topline .eyebrow{padding-right:0!important;display:inline-block!important;flex:0 0 auto!important}
+      .shoot-card-topline .shoot-status{position:static!important;inset:auto!important;margin:0!important;transform:none!important;flex:0 0 auto!important}
+      .pf-archive-empty{padding:36px 18px;text-align:center;color:#7f8795;font-size:16px}
+    `;
+    document.head.appendChild(style);
   };
-  const restoreFilterAnchor = () => {
-    const y = Math.max(0, Number(filterAnchorY) || 0);
-    const go = () => { window.scrollTo({top:y,left:0,behavior:'auto'}); document.documentElement.scrollTop=y; document.body.scrollTop=y; };
-    go(); requestAnimationFrame(go); requestAnimationFrame(()=>requestAnimationFrame(go));
-    [40,100,220,450,800].forEach(ms=>setTimeout(go,ms));
-  };
-  document.addEventListener('pointerdown', e => rememberFilterAnchor(e.target), true);
-  document.addEventListener('touchstart', e => rememberFilterAnchor(e.target), {capture:true,passive:true});
-  document.addEventListener('focusin', e => rememberFilterAnchor(e.target), true);
-  document.addEventListener('change', e => { if (isStatusFilter(e.target)) restoreFilterAnchor(); }, true);
 
-  const parseDate = text => { const m=String(text||'').match(/(\d{2})\.(\d{2})\.(\d{4})/); return m?new Date(Number(m[3]),Number(m[2])-1,Number(m[1])):null; };
-  const today = () => { const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()); };
+  const formatDate = (iso) => {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
+  };
+
+  const isStatusFilter = (el) => el instanceof HTMLSelectElement && (
+    el.getAttribute('aria-label') === 'Фильтр съёмок по статусу' ||
+    [...el.options].some(o => /архив/i.test(o.textContent || ''))
+  );
+
+  let archiveMode = false;
+
+  const isArchiveChoice = (select) => {
+    const selected = select.options[select.selectedIndex];
+    return select.value === 'archived' || /архив/i.test(selected?.textContent || '');
+  };
+
+  const renderArchiveMode = () => {
+    if (!archiveMode) return;
+    const panel = document.querySelector('.shoot-list-panel');
+    const list = panel?.querySelector('.shoot-list');
+    const select = document.querySelector('select[aria-label="Фильтр съёмок по статусу"]');
+    if (!panel || !list || !select) return;
+
+    const archivedOption = [...select.options].find(o => o.value === 'archived' || /архив/i.test(o.textContent || ''));
+    if (archivedOption) select.value = archivedOption.value;
+
+    const delivered = readSnapshot().shoots.filter(s => s.delivered || s.archived || s.status === 'delivered');
+    const keys = new Set(delivered.map(s => `${String(s.clientName || '').trim()}|${formatDate(s.startAt)}`));
+    let shown = 0;
+
+    list.querySelectorAll('.shoot-card').forEach(card => {
+      const name = (card.querySelector('h3')?.textContent || '').trim();
+      const dateText = card.querySelector('.shoot-schedule span')?.textContent || '';
+      const date = dateText.match(/\d{2}\.\d{2}\.\d{4}/)?.[0] || '';
+      const visible = keys.has(`${name}|${date}`);
+      card.style.display = visible ? '' : 'none';
+      if (visible) shown += 1;
+    });
+
+    let empty = list.querySelector('.pf-archive-empty');
+    if (!shown) {
+      if (!empty) {
+        empty = document.createElement('div');
+        empty.className = 'pf-archive-empty';
+        empty.textContent = 'Архив пока пуст';
+        list.appendChild(empty);
+      }
+    } else if (empty) {
+      empty.remove();
+    }
+
+    const count = panel.querySelector('.panel-actions > span');
+    if (count) count.textContent = `${shown} ${shown === 1 ? 'проект' : shown >= 2 && shown <= 4 ? 'проекта' : 'проектов'}`;
+
+    const y = Math.max(0, window.scrollY + panel.getBoundingClientRect().top - 12);
+    window.scrollTo({ top: y, left: 0, behavior: 'auto' });
+  };
+
+  const clearArchiveMode = () => {
+    archiveMode = false;
+    document.querySelectorAll('.shoot-card').forEach(card => card.style.display = '');
+    document.querySelectorAll('.pf-archive-empty').forEach(el => el.remove());
+  };
+
+  document.addEventListener('change', event => {
+    const select = event.target;
+    if (!isStatusFilter(select)) return;
+
+    if (isArchiveChoice(select)) {
+      archiveMode = true;
+      const allOption = [...select.options].find(o => o.value === 'all' || /^все$/i.test((o.textContent || '').trim()));
+      if (allOption) select.value = allOption.value;
+      [0, 30, 80, 180, 400].forEach(ms => setTimeout(renderArchiveMode, ms));
+    } else {
+      clearArchiveMode();
+    }
+  }, true);
+
+  const parseDate = (text) => {
+    const m = String(text || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
+    return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+  };
+
+  const today = () => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
   const patch = () => {
-    forceStatusAlignment();
-    const hero=document.querySelector('.shoot-day-hero');
-    if(hero){ const d=parseDate(hero.querySelector('.shoot-day-copy p')?.textContent); hero.style.display=d&&d<today()?'none':''; const label=hero.querySelector('.shoot-day-metrics > div:first-child span'); if(label&&/выехать\s+в/i.test(label.textContent||''))label.textContent='Выезд'; }
-    document.querySelectorAll('.panel-actions .danger-link').forEach(el=>el.remove());
-    document.querySelectorAll('.shoot-price').forEach(el=>{ if(el.dataset.pfPatched==='1')return; const raw=(el.textContent||'').replace(/\s+/g,' ').trim(); if(!raw.includes('/'))return; const parts=raw.split('/').map(x=>x.trim()); if(parts.length!==2||!parts[0]||!parts[1])return; const paid=parts[0],total=parts[1]; el.innerHTML=''; const strong=document.createElement('strong'); strong.textContent=total; const small=document.createElement('small'); small.textContent=`Предоплата: ${paid}`; el.append(strong,small); el.dataset.pfPatched='1'; });
+    ensureStyles();
+
+    const hero = document.querySelector('.shoot-day-hero');
+    if (hero) {
+      const date = parseDate(hero.querySelector('.shoot-day-copy p')?.textContent);
+      hero.style.display = date && date < today() ? 'none' : '';
+      const label = hero.querySelector('.shoot-day-metrics > div:first-child span');
+      if (label && /выехать\s+в/i.test(label.textContent || '')) label.textContent = 'Выезд';
+    }
+
+    document.querySelectorAll('.panel-actions .danger-link').forEach(el => el.remove());
+
+    document.querySelectorAll('.shoot-price').forEach(el => {
+      if (el.dataset.pfPatched === '1') return;
+      const raw = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!raw.includes('/')) return;
+      const parts = raw.split('/').map(x => x.trim());
+      if (parts.length !== 2 || !parts[0] || !parts[1]) return;
+      const paid = parts[0];
+      const total = parts[1];
+      el.innerHTML = '';
+      const strong = document.createElement('strong');
+      strong.textContent = total;
+      const small = document.createElement('small');
+      small.textContent = `Предоплата: ${paid}`;
+      el.append(strong, small);
+      el.dataset.pfPatched = '1';
+    });
+
+    if (archiveMode) renderArchiveMode();
   };
-  const run=()=>requestAnimationFrame(patch);
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true}); else run();
-  let queued=false; new MutationObserver(()=>{ if(queued)return; queued=true; requestAnimationFrame(()=>{queued=false;patch();}); }).observe(document.documentElement,{childList:true,subtree:true});
-  setTimeout(patch,500); setTimeout(patch,1500);
+
+  const run = () => requestAnimationFrame(patch);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
+  else run();
+
+  let queued = false;
+  new MutationObserver(() => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      patch();
+    });
+  }).observe(document.documentElement, { childList: true, subtree: true });
+
+  setTimeout(patch, 500);
+  setTimeout(patch, 1500);
 })();
