@@ -17,16 +17,53 @@
     .shoot-card-topline .eyebrow{padding-right:0!important;display:inline-block!important;flex:0 0 auto!important}
     .shoot-card-topline .shoot-status{position:static!important;inset:auto!important;margin:0!important;transform:none!important;flex:0 0 auto!important}
     .backup-card{display:none!important}
+    .pf-paid-wrap{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:8px!important;flex-wrap:wrap!important}
+    .pf-paid-btn{appearance:none;border:1px solid #a8dfcb;background:#edf9f4;color:#247a61;border-radius:999px;padding:7px 11px;font:700 12px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,sans-serif;white-space:nowrap;cursor:pointer}
+    .pf-paid-btn:active{transform:scale(.97)}
+    .pf-paid-btn[disabled]{opacity:.7;cursor:default}
   `;document.head.appendChild(style)};
 
   const parseDate=text=>{const m=String(text||'').match(/(\d{2})\.(\d{2})\.(\d{4})/);return m?new Date(Number(m[3]),Number(m[2])-1,Number(m[1])):null};
   const today=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())};
+  const formatShootDate=iso=>{const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}.${m[2]}.${m[1]}`:''};
 
   const patchRiskRadar=()=>{const radar=document.querySelector('.risk-radar');if(!radar)return;const buttons=[...radar.querySelectorAll('.risk-grid > button')];buttons.forEach(button=>{const text=(button.textContent||'').replace(/\s+/g,' ').trim();const unwanted=/съ[её]мк\w*\s+за\s+7\s+дн/i.test(text)||/проверьте\s+дорогу.*техник/i.test(text)||/материал\s+без\s+2[-–—]?й?\s+коп/i.test(text)||/резервн\w*\s+коп/i.test(text);button.style.display=unwanted?'none':''});const visible=buttons.filter(b=>b.style.display!=='none');const heading=radar.querySelector('.panel-title-row h2');if(heading){const n=visible.length;heading.textContent=n===0?'Всё под контролем':n===1?'1 сигнал требует внимания':`${n} ${n>=2&&n<=4?'сигнала требуют':'сигналов требуют'} внимания`}};
   const patchDemoToast=()=>{document.querySelectorAll('.toast,.notification,.snackbar,[role="status"],[role="alert"]').forEach(el=>{if(/демонстрационн/i.test(el.textContent||''))el.style.display='none'})};
   const patchHero=()=>{const hero=document.querySelector('.shoot-day-hero');if(!hero)return;const date=parseDate(hero.querySelector('.shoot-day-copy p')?.textContent);hero.style.display=date&&date<today()?'none':'';const label=hero.querySelector('.shoot-day-metrics > div:first-child span');if(label&&/выехать\s+в/i.test(label.textContent||''))label.textContent='Выезд'};
   const patchPrices=()=>{document.querySelectorAll('.shoot-price').forEach(el=>{if(el.dataset.pfPatched==='1')return;const raw=(el.textContent||'').replace(/\s+/g,' ').trim();if(!raw.includes('/'))return;const parts=raw.split('/').map(x=>x.trim());if(parts.length!==2||!parts[0]||!parts[1])return;const paid=parts[0],total=parts[1];el.innerHTML=`<strong>${total}</strong><small>Предоплата: ${paid}</small>`;el.dataset.pfPatched='1'})};
-  const patch=()=>{ensureStyles();patchDemoToast();patchHero();patchRiskRadar();patchPrices();document.querySelectorAll('.panel-actions .danger-link').forEach(el=>{el.style.display='none'})};
+
+  const patchBalanceModal=()=>{
+    const all=[...document.querySelectorAll('h1,h2,h3,div,span')];
+    const title=all.find(el=>/^КЛИЕНТЫ С ОСТАТКОМ$/i.test((el.textContent||'').trim()));
+    if(!title)return;
+    const modal=title.closest('[role="dialog"]')||title.closest('.modal')||title.parentElement?.parentElement?.parentElement;
+    if(!modal)return;
+    const snapshot=readSnapshot();
+    [...modal.querySelectorAll('button')].forEach(row=>{
+      if(row.classList.contains('pf-paid-btn')||row.querySelector('.pf-paid-btn'))return;
+      const text=(row.textContent||'').replace(/\s+/g,' ').trim();
+      const date=text.match(/\d{2}\.\d{2}\.\d{4}/)?.[0];
+      const amountEl=[...row.querySelectorAll('*')].find(el=>/₽\s*к\s*оплате/i.test(el.textContent||''));
+      if(!date||!amountEl)return;
+      const shoot=snapshot.shoots.find(s=>formatShootDate(s.startAt)===date&&text.includes(String(s.clientName||'')));
+      if(!shoot)return;
+      const btn=document.createElement('button');
+      btn.type='button';btn.className='pf-paid-btn';btn.textContent='Оплачено';
+      const wrap=document.createElement('span');wrap.className='pf-paid-wrap';
+      amountEl.parentNode.insertBefore(wrap,amountEl);wrap.append(amountEl,btn);
+      btn.addEventListener('click',ev=>{
+        ev.preventDefault();ev.stopPropagation();
+        const current=readSnapshot();
+        current.shoots=current.shoots.map(s=>Number(s.id)===Number(shoot.id)?{...s,paidAmount:Number(s.price)||0}:s);
+        writeSnapshot(current);
+        btn.textContent='✓ Оплачено';btn.disabled=true;
+        amountEl.textContent='0 ₽ к оплате';
+        setTimeout(()=>{row.style.display='none';const visible=[...modal.querySelectorAll('button')].filter(b=>b!==btn&&b.style.display!=='none'&&/\d{2}\.\d{2}\.\d{4}/.test(b.textContent||''));if(!visible.length){const total=[...modal.querySelectorAll('*')].find(el=>/\d[\d\s]*\s*₽\s*не\s*получено/i.test(el.textContent||''));if(total)total.textContent='0 ₽ не получено'}},350);
+      },true);
+    });
+  };
+
+  const patch=()=>{ensureStyles();patchDemoToast();patchHero();patchRiskRadar();patchPrices();patchBalanceModal();document.querySelectorAll('.panel-actions .danger-link').forEach(el=>{el.style.display='none'})};
   const schedulePatch=()=>{requestAnimationFrame(patch);setTimeout(patch,80);setTimeout(patch,260)};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedulePatch,{once:true});else schedulePatch();
   document.addEventListener('click',schedulePatch,true);
