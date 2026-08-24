@@ -1,0 +1,15 @@
+(()=>{'use strict';
+const SNAP='fotocrm:snapshot:v2';
+const read=()=>{try{return JSON.parse(localStorage.getItem(SNAP)||'{}')}catch{return{}}};
+const write=v=>{try{localStorage.setItem(SNAP,JSON.stringify(v));return true}catch{return false}};
+const fmt=iso=>{const d=new Date(iso||'');return Number.isFinite(d.getTime())?d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'}):''};
+function findShoot(shell){const row=shell?.querySelector('.pf-pay-row,.risk-selection-list>button');if(!row)return null;const tx=(row.textContent||'').replace(/\s+/g,' '),date=tx.match(/\d{2}\.\d{2}\.\d{4}/)?.[0]||'';const state=read(),shoots=Array.isArray(state.shoots)?state.shoots:[];return shoots.find(s=>Number(s.paidAmount||0)<Number(s.price||0)&&tx.includes(String(s.clientName||''))&&(!date||fmt(s.startAt)===date))||null}
+async function pay(shell){if(!shell||shell.dataset.pfPayBusy==='1')return;const shoot=findShoot(shell);if(!shoot)return;const action=shell.querySelector('.pf-pay-action');shell.dataset.pfPayBusy='1';if(action){action.disabled=true;action.textContent='Сохраняю…'}try{const r=await fetch('/api/crm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'updateShoot',id:shoot.id,data:{paidAmount:Number(shoot.price)||0}})});if(!r.ok)throw Error('save');let server=null;try{server=await r.json()}catch{};if(server&&Array.isArray(server.shoots))write(server);else{const state=read();state.shoots=(state.shoots||[]).map(s=>Number(s.id)===Number(shoot.id)?{...s,paidAmount:Number(s.price)||0}:s);write(state)}shell.remove()}catch{shell.dataset.pfPayBusy='';if(action){action.disabled=false;action.textContent='Оплачено'}}}
+function style(){if(document.getElementById('pf-payment-swipe-fix-style'))return;const s=document.createElement('style');s.id='pf-payment-swipe-fix-style';s.textContent=`.pf-pay-action{pointer-events:auto!important;z-index:1!important;cursor:pointer!important}.pf-pay-row{z-index:2!important}`;document.head.appendChild(s)}
+let startX=0,startY=0,target=null,maxLeft=0;
+document.addEventListener('touchstart',e=>{const row=e.target?.closest?.('.pf-pay-row');if(!row||e.touches.length!==1)return;target=row.closest('.pf-pay-shell');if(!target)return;startX=e.touches[0].clientX;startY=e.touches[0].clientY;maxLeft=0},{passive:true,capture:true});
+document.addEventListener('touchmove',e=>{if(!target||e.touches.length!==1)return;const dx=e.touches[0].clientX-startX,dy=e.touches[0].clientY-startY;if(Math.abs(dx)>Math.abs(dy)&&dx<0)maxLeft=Math.max(maxLeft,-dx)},{passive:true,capture:true});
+document.addEventListener('touchend',()=>{const shell=target,dist=maxLeft;target=null;maxLeft=0;if(shell&&dist>=105)pay(shell)},{passive:true,capture:true});
+document.addEventListener('click',e=>{const btn=e.target?.closest?.('.pf-pay-action');if(!btn)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();pay(btn.closest('.pf-pay-shell'))},true);
+style();
+})();
