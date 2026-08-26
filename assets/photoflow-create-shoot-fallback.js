@@ -12,6 +12,7 @@ const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 const arr=v=>Array.isArray(v)?v:[];
 function safeItem(item={}){return{id:str(item.id)||`item-${Date.now()}-${Math.random().toString(36).slice(2)}`,label:str(item.label),done:!!item.done}}
 function safeTimeline(item={}){return{id:str(item.id)||`step-${Date.now()}-${Math.random().toString(36).slice(2)}`,time:/^\d{2}:\d{2}$/.test(str(item.time))?item.time:'10:00',label:str(item.label)||'Этап',done:!!item.done}}
+function arrivalTimeline(startAt){const d=new Date(startAt||'');if(!Number.isFinite(d.getTime()))return[];d.setMinutes(d.getMinutes()-20);return[{id:`arrival-${Date.now()}-${Math.random().toString(36).slice(2)}`,time:`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,label:'Прибытие',done:false}]}
 function safeShoot(s={}){return{
  ...s,
  id:Number.isFinite(Number(s.id))?Number(s.id):-Date.now(),
@@ -23,15 +24,17 @@ function safeType(t={}){return{name:str(t.name)||'Съёмка',color:str(t.colo
 function safeClient(c={}){return{...c,id:Number.isFinite(Number(c.id))?Number(c.id):-Date.now(),name:str(c.name)||'Без имени',phone:str(c.phone),email:str(c.email),kind:str(c.kind)||'person',notes:str(c.notes)}}
 function normalizeState(v,base){const b=base||{};return{...b,...(v&&typeof v==='object'?v:{}),clients:arr(v?.clients??b.clients).map(safeClient),shoots:arr(v?.shoots??b.shoots).map(safeShoot),types:arr(v?.types??b.types).map(safeType),reminders:arr(v?.reminders??b.reminders).length?arr(v?.reminders??b.reminders).map(x=>num(x)): [5,1,0],profile:v?.profile&&typeof v.profile==='object'?v.profile:(b.profile&&typeof b.profile==='object'?b.profile:{})}}
 function cloneState(){return normalizeState(read(SNAP,{}),{})}
+function withInitialTimeline(data={}){return{...data,timeline:arrivalTimeline(data.startAt)}}
 function queueCreate(data,id){const q=arr(read(QUEUE,[]));const key=(globalThis.crypto&&typeof crypto.randomUUID==='function')?crypto.randomUUID():`pf-${Date.now()}-${Math.random()}`;write(QUEUE,[...q,{key,action:'createShoot',data:{...data,__offlineId:id},id:void 0}])}
 function makeResponse(state){write(SNAP,state);return new Response(JSON.stringify(state),{status:200,headers:{'content-type':'application/json'}})}
-function localResponse(data){const state=cloneState();const id=-Date.now();state.shoots=[...state.shoots,safeShoot({...data,id})];queueCreate(data,id);return makeResponse(state)}
+function localResponse(data){const state=cloneState();const id=-Date.now();const prepared=withInitialTimeline(data);state.shoots=[...state.shoots,safeShoot({...prepared,id})];queueCreate(prepared,id);return makeResponse(state)}
 window.fetch=async function(input,init){
  let url='';try{url=typeof input==='string'?input:(input?.url||'')}catch{}
  let body=null;
  if(url.includes('/api/crm')&&init?.method?.toUpperCase()==='POST'){
    try{body=typeof init.body==='string'?JSON.parse(init.body):null}catch{}
    if(body?.action==='createShoot'){
+     const prepared=withInitialTimeline(body.data||{});body={...body,data:prepared};init={...init,body:JSON.stringify(body)};
      const base=cloneState();
      try{
        const r=await nativeFetch(input,init);
@@ -41,8 +44,8 @@ window.fetch=async function(input,init){
            if(data&&typeof data==='object'&&Array.isArray(data.shoots))return makeResponse(normalizeState(data,base));
          }catch{}
        }
-       return localResponse(body.data||{});
-     }catch{return localResponse(body.data||{})}
+       return localResponse(prepared);
+     }catch{return localResponse(prepared)}
    }
  }
  return nativeFetch(input,init);
