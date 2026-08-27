@@ -42,8 +42,12 @@ window.fetch=async function(input,init){
          try{
            const data=await r.clone().json();
            if(data&&typeof data==='object'&&Array.isArray(data.shoots))return makeResponse(normalizeState(data,base));
+           if(data?.shoot){const state=normalizeState(base,base);state.shoots=[...state.shoots,safeShoot(data.shoot)];return makeResponse(state)}
          }catch{}
+         try{const fresh=await nativeFetch('/api/crm');if(fresh.ok){const data=await fresh.json();if(Array.isArray(data?.shoots))return makeResponse(normalizeState(data,base))}}catch{}
+         return r;
        }
+       if(r.status<500&&r.status!==408&&r.status!==429)return r;
        return localResponse(prepared);
      }catch{return localResponse(prepared)}
    }
