@@ -81,8 +81,10 @@ function ensureStyle(){
   `;document.head.appendChild(s);
 }
 function cleanup(){
+  const removed=/^(Погода и свет|Резервные копии)$/i;
   document.querySelectorAll('.day-weather,.weather-card,.backup-card,.day-backup').forEach(el=>el.remove());
-  document.querySelectorAll('.risk-grid button').forEach(btn=>{const t=(btn.textContent||'').replace(/\s+/g,' ');if(/Материал без 2-й копии/i.test(t)||/съёмк[аи]\s+за\s+7\s+д/i.test(t))btn.remove()});
+  document.querySelectorAll('.day-mode section').forEach(section=>{const label=(section.querySelector('span,strong,h2,h3')?.textContent||'').trim();if(removed.test(label))section.remove()});
+  document.querySelectorAll('.risk-grid button').forEach(btn=>{if(!/не получено/i.test((btn.textContent||'').replace(/\s+/g,' ')))btn.remove()});
   document.querySelectorAll('.shoot-list-panel .danger-link,.panel-actions .danger-link').forEach(el=>el.remove());
 }
 function reactHandler(el){
@@ -188,17 +190,9 @@ function patchSmart(){
   if(heading&&!heading.querySelector('.pf-smart-plus')){heading.querySelector('small')?.remove();const plus=document.createElement('button');plus.type='button';plus.className='pf-smart-plus';plus.textContent='+';plus.setAttribute('aria-label','Добавить умное сообщение');plus.onclick=()=>openSmartModal(null);heading.appendChild(plus)}
   section.querySelectorAll('[data-pf-custom="1"]').forEach(el=>el.remove());
   section.querySelectorAll('article:not([data-pf-custom="1"])').forEach(article=>{
-    const title=articleTitle(article);if(!title||!DEFAULT_SMART[title])return;const template=overrides[title]||DEFAULT_SMART[title];const p=article.querySelector('p');if(p)p.textContent=renderTemplate(template,shoot);const buttons=[...article.querySelectorAll('button')];if(buttons[0]){buttons[0].textContent='Редактировать';buttons[0].onclick=e=>{e.preventDefault();e.stopPropagation();openSmartModal({kind:'builtin',title,template})}}if(buttons[1]){buttons[1].textContent='Отправить';buttons[1].onclick=e=>{e.preventDefault();e.stopPropagation();sendText(renderTemplate(template,shoot))}}
+    const title=articleTitle(article);if(!title||!DEFAULT_SMART[title])return;const template=overrides[title]||DEFAULT_SMART[title];const p=article.querySelector('p');if(p)p.textContent=renderTemplate(template,shoot);let actions=article.querySelector('p+div')||article.querySelector('div');if(!actions){actions=document.createElement('div');article.appendChild(actions)}actions.innerHTML='<button type="button">Редактировать</button><button type="button">Отправить</button>';const buttons=[...actions.querySelectorAll('button')];buttons[0].onclick=e=>{e.preventDefault();e.stopPropagation();openSmartModal({kind:'builtin',title,template})};buttons[1].onclick=e=>{e.preventDefault();e.stopPropagation();sendText(renderTemplate(template,shoot))}
   });
   custom.forEach(item=>{const a=document.createElement('article');a.dataset.pfCustom='1';a.innerHTML='<strong></strong><p></p><div><button type="button">Редактировать</button><button type="button">Отправить</button></div>';a.querySelector('strong').textContent=item.title;a.querySelector('p').textContent=renderTemplate(item.text,shoot);const [edit,send]=a.querySelectorAll('button');edit.onclick=()=>openSmartModal({kind:'custom',id:item.id,title:item.title,template:item.text});send.onclick=()=>sendText(renderTemplate(item.text,shoot));section.appendChild(a)});
-}
-function patchPaymentSwipe(){
-  const title=[...document.querySelectorAll('h1,h2,h3')].find(x=>/^КЛИЕНТЫ С ОСТАТКОМ$/i.test((x.textContent||'').trim()));if(!title)return;
-  const modal=title.closest('.modal')||title.parentElement?.parentElement;if(!modal)return;const state=snap();
-  modal.querySelectorAll('.risk-selection-list>button').forEach(row=>{
-    if(row.closest('.pf-pay-shell'))return;const tx=(row.textContent||'').replace(/\s+/g,' '),date=tx.match(/\d{2}\.\d{2}\.\d{4}/)?.[0];const shoot=(state.shoots||[]).find(s=>fmtDate(s.startAt)===date&&tx.includes(String(s.clientName||''))&&Number(s.paidAmount)<Number(s.price));if(!shoot)return;
-    const shell=document.createElement('div');shell.className='pf-pay-shell';row.parentNode.insertBefore(shell,row);shell.appendChild(row);row.classList.add('pf-pay-row');const action=document.createElement('button');action.type='button';action.className='pf-pay-action';action.textContent='Оплачено';shell.insertBefore(action,row);installSwipe(row,118,open=>shell.classList.toggle('pf-open',open));action.onclick=async()=>{action.disabled=true;if(await saveShoot(shoot,{paidAmount:Number(shoot.price)||0})){shell.remove();schedule(0)}else action.disabled=false};
-  });
 }
 function patchEditors(){const mode=document.querySelector('.day-mode');if(!mode)return;const timeline=mode.querySelector('.day-timeline');if(timeline&&timeline.dataset.pfRuntime!=='timeline')renderTimeline(timeline);const active=[...mode.querySelectorAll('.day-tabs button')].find(b=>b.classList.contains('active'))?.textContent?.trim();if(active==='Техника')renderTech()}
 function patch(){ensureStyle();cleanup();patchEditors();patchSmart();patchPaymentSwipe()}
