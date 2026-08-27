@@ -89,17 +89,6 @@ function cleanup(){
   document.querySelectorAll('.risk-grid button').forEach(btn=>{if(!/не получено/i.test((btn.textContent||'').replace(/\s+/g,' ')))btn.remove()});
   document.querySelectorAll('.shoot-list-panel .danger-link,.panel-actions .danger-link').forEach(el=>el.remove());
 }
-function reactHandler(el){
-  if(!el)return null;const keys=Object.keys(el);const p=keys.find(k=>k.startsWith('__reactProps$'));if(p&&typeof el[p]?.onClick==='function')return el[p].onClick;
-  let f=keys.find(k=>k.startsWith('__reactFiber$'));let n=f?el[f]:null;for(let i=0;n&&i<8;i++,n=n.return){if(typeof n.memoizedProps?.onClick==='function')return n.memoizedProps.onClick;if(typeof n.pendingProps?.onClick==='function')return n.pendingProps.onClick}return null;
-}
-function closeMode(e){
-  const btn=e.target?.closest?.('button[aria-label="Закрыть"]');const mode=document.querySelector('.day-mode');if(!btn||!mode)return;
-  const modal=mode.closest('.modal');if(!modal||!modal.contains(btn))return;
-  const fn=reactHandler(btn);if(typeof fn!=='function')return;
-  e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();
-  try{fn({currentTarget:btn,target:btn,preventDefault(){},stopPropagation(){},nativeEvent:e})}catch{try{btn.click()}catch{}}
-}
 function installSwipe(row,reveal,onOpen){
   let sx=0,sy=0,dx=0,active=false,open=false,moved=false;
   row.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;dx=open?-reveal:0;active=true;moved=false},{passive:true});
@@ -197,12 +186,12 @@ function patchSmart(){
   custom.forEach(item=>{const a=document.createElement('article');a.dataset.pfCustom='1';a.innerHTML='<strong></strong><p></p><div><button type="button">Редактировать</button><button type="button">Отправить</button></div>';a.querySelector('strong').textContent=item.title;a.querySelector('p').textContent=renderTemplate(item.text,shoot);const [edit,send]=a.querySelectorAll('button');edit.onclick=()=>openSmartModal({kind:'custom',id:item.id,title:item.title,template:item.text});send.onclick=()=>sendText(renderTemplate(item.text,shoot));section.appendChild(a)});
 }
 function patchEditors(){const mode=document.querySelector('.day-mode');if(!mode)return;const timeline=mode.querySelector('.day-timeline');if(timeline&&timeline.dataset.pfRuntime!=='timeline')renderTimeline(timeline);const active=[...mode.querySelectorAll('.day-tabs button')].find(b=>b.classList.contains('active'))?.textContent?.trim();if(active==='Техника')renderTech()}
-function patch(){ensureStyle();cleanup();patchEditors();patchSmart();patchPaymentSwipe()}
+function patch(){ensureStyle();cleanup();patchEditors();patchSmart()}
 let timer=0;function schedule(delay=30){clearTimeout(timer);timer=setTimeout(()=>requestAnimationFrame(patch),delay)}
 function lifecycleClick(e){
   const btn=e.target?.closest?.('button,a');if(!btn)return;const t=(btn.textContent||'').trim();
   if(t==='Открыть проект'||t==='Тайминг'||t==='Техника'||t==='+'||/Показать|не получено|Мои съёмки|Календарь|Клиенты|Финансы|Настройки|Профиль/.test(t)){schedule(30);setTimeout(()=>schedule(0),160)}
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>schedule(0),{once:true});else schedule(0);
-document.addEventListener('pointerup',closeMode,true);document.addEventListener('click',tabHandler,true);document.addEventListener('click',lifecycleClick,true);window.addEventListener('pageshow',()=>schedule(0));document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule(0)});
+document.addEventListener('click',tabHandler,true);document.addEventListener('click',lifecycleClick,true);window.addEventListener('pageshow',()=>schedule(0));document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule(0)});
 })();
