@@ -22,11 +22,13 @@ const fmtTime=iso=>{const d=new Date(iso||'');return Number.isFinite(d.getTime()
 function currentShoot(){
   const state=snap(),mode=document.querySelector('.day-mode');
   if(!mode)return null;
+  const shoots=Array.isArray(state.shoots)?state.shoots:[];
+  const id=Number(mode.dataset.shootId);
+  if(Number.isFinite(id)){const exact=shoots.find(s=>Number(s.id)===id);if(exact)return exact}
   const hero=mode.querySelector('.day-hero,.shoot-day-hero')||mode;
   const text=hero.textContent||'';
   const name=(hero.querySelector('h1,h2,h3')?.textContent||'').trim();
   const date=text.match(/\d{2}\.\d{2}\.\d{4}/)?.[0]||'';
-  const shoots=Array.isArray(state.shoots)?state.shoots:[];
   return shoots.find(s=>String(s.clientName||'').trim()===name&&(!date||fmtDate(s.startAt)===date))
     ||shoots.find(s=>date&&fmtDate(s.startAt)===date)
     ||shoots.find(s=>String(s.clientName||'').trim()===name)
