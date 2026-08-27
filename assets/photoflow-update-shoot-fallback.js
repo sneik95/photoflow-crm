@@ -23,8 +23,9 @@ function patchLocal(id,data){
     write(QUEUE,safe.map(item=>item?.action==='createShoot'&&Number(item?.data?.__offlineId)===Number(id)?{...item,data:{...item.data,...data,__offlineId:Number(id)}}:item));
   }else{
     const key=(globalThis.crypto&&typeof crypto.randomUUID==='function')?crypto.randomUUID():`pf-up-${Date.now()}-${Math.random()}`;
-    const exists=safe.some(item=>item?.action==='updateShoot'&&Number(item?.id)===Number(id));
-    if(!exists)write(QUEUE,[...safe,{key,action:'updateShoot',data:{...data},id:Number(id)}]);
+    const index=safe.findIndex(item=>item?.action==='updateShoot'&&Number(item?.id)===Number(id));
+    if(index>=0){const next=[...safe];next[index]={...next[index],data:{...(next[index].data||{}),...data}};write(QUEUE,next)}
+    else write(QUEUE,[...safe,{key,action:'updateShoot',data:{...data},id:Number(id)}]);
   }
   return state;
 }
@@ -40,7 +41,9 @@ window.fetch=async function(input,init){
     const r=await nativeFetch(input,init);
     if(r.ok){
       try{const state=await r.clone().json();if(Array.isArray(state?.shoots))return r}catch{}
+      return r;
     }
+    if(r.status<500&&r.status!==408&&r.status!==429)return r;
   }catch{}
   return response(patchLocal(id,data));
 };
