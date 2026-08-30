@@ -1,6 +1,10 @@
 (()=>{
 'use strict';
+const documentRoot=typeof document!=='undefined'?document.documentElement:null;
+documentRoot?.classList.add('pf-booting');
+window.setTimeout(()=>documentRoot?.classList.remove('pf-booting'),6000);
 const SNAP='fotocrm:snapshot:v2';
+const QUEUE='fotocrm:offline-queue:v1';
 const CUSTOM='photoflow:smart-custom:v1';
 const OVERRIDES='photoflow:smart-overrides:v1';
 const VARS=['{имя}','{дата}','{время}','{место}','{срок_сдачи}','{остаток}','{стоимость}','{предоплата}','{оплата}'];
@@ -19,6 +23,217 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const money=n=>Number(n||0).toLocaleString('ru-RU');
 const fmtDate=iso=>{const d=new Date(iso||'');return Number.isFinite(d.getTime())?d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'}):''};
 const fmtTime=iso=>{const d=new Date(iso||'');return Number.isFinite(d.getTime())?d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):''};
+
+const array=value=>Array.isArray(value)?value:[];
+const numeric=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
+const queue=()=>array(read(QUEUE,[])).filter(item=>item?.action!=='deleteActiveShoots'&&item?.action!=='deleteAllShoots');
+const queueWrite=items=>write(QUEUE,array(items));
+const queueKey=prefix=>`${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const validState=value=>!!value&&typeof value==='object'&&Array.isArray(value.clients)&&Array.isArray(value.shoots)&&Array.isArray(value.types);
+function normalizeShoot(value={}){
+  return {
+    ...value,
+    id:Number.isFinite(Number(value.id))?Number(value.id):-Date.now(),
+    clientId:value.clientId==null?null:Number(value.clientId),clientName:String(value.clientName||'Без имени'),clientPhone:String(value.clientPhone||''),
+    type:String(value.type||'Съёмка'),color:String(value.color||'#5267FF'),startAt:String(value.startAt||''),endAt:String(value.endAt||value.startAt||''),
+    allDay:!!value.allDay,comment:String(value.comment||''),price:numeric(value.price),paymentType:String(value.paymentType||'advance'),paidAmount:numeric(value.paidAmount),
+    deliveryDays:Math.max(1,numeric(value.deliveryDays,14)),delivered:!!value.delivered,archived:!!value.archived,status:String(value.status||'booked'),
+    location:String(value.location||''),travelMinutes:numeric(value.travelMinutes),organizerName:String(value.organizerName||''),organizerPhone:String(value.organizerPhone||''),
+    editingHours:numeric(value.editingHours),travelCost:numeric(value.travelCost),otherCosts:numeric(value.otherCosts),equipment:array(value.equipment),shotList:array(value.shotList),
+    timeline:array(value.timeline),portalToken:String(value.portalToken||''),clientGuide:String(value.clientGuide||'')
+  };
+}
+function normalizeState(value={},fallback={}){
+  const source=value&&typeof value==='object'?value:{},base=fallback&&typeof fallback==='object'?fallback:{};
+  return {
+    ...base,...source,
+    clients:array(source.clients??base.clients),
+    shoots:array(source.shoots??base.shoots).map(normalizeShoot),
+    types:array(source.types??base.types),
+    reminders:array(source.reminders??base.reminders).length?array(source.reminders??base.reminders):[5,1,0],
+    profile:source.profile&&typeof source.profile==='object'?source.profile:(base.profile&&typeof base.profile==='object'?base.profile:{})
+  };
+}
+function arrivalTimeline(startAt){
+  const dateValue=new Date(startAt||'');if(!Number.isFinite(dateValue.getTime()))return[];
+  dateValue.setMinutes(dateValue.getMinutes()-20);
+  return [{id:`arrival-${Date.now()}-${Math.random().toString(36).slice(2)}`,time:`${String(dateValue.getHours()).padStart(2,'0')}:${String(dateValue.getMinutes()).padStart(2,'0')}`,label:'Прибытие',done:false}];
+}
+function applyAction(source,action,data={},id){
+  const state=normalizeState(source),shootId=Number(id);
+  if(action==='createShoot'){
+    const temp=Number.isFinite(Number(data.__offlineId))?Number(data.__offlineId):(Number.isFinite(shootId)?shootId:-Date.now());
+    const clean={...data,id:temp};delete clean.__offlineId;const shoot=normalizeShoot(clean),index=state.shoots.findIndex(item=>Number(item.id)===temp);
+    state.shoots=index>=0?state.shoots.map((item,i)=>i===index?shoot:item):[...state.shoots,shoot];
+  }else if(action==='updateShoot'&&Number.isFinite(shootId))state.shoots=state.shoots.map(item=>Number(item.id)===shootId?normalizeShoot({...item,...data,id:item.id}):item);
+  else if(action==='deleteShoot'&&Number.isFinite(shootId))state.shoots=state.shoots.filter(item=>Number(item.id)!==shootId);
+  else if(action==='createClient'){
+    const temp=Number.isFinite(Number(data.__offlineId))?Number(data.__offlineId):-Date.now(),clean={...data,id:temp};delete clean.__offlineId;
+    state.clients=[...state.clients.filter(item=>Number(item.id)!==temp),clean];
+  }else if(action==='savePreferences'){
+    if(data.profile&&typeof data.profile==='object')state.profile=data.profile;
+    if(Array.isArray(data.types))state.types=data.types;
+    if(Array.isArray(data.reminders))state.reminders=data.reminders;
+    if(data.deliveryReminder&&typeof data.deliveryReminder==='object')state.deliveryReminder=data.deliveryReminder;
+  }
+  return state;
+}
+function emitState(state,reason='local'){
+  const normalized=normalizeState(state);write(SNAP,normalized);
+  window.dispatchEvent(new CustomEvent('photoflow:state-changed',{detail:{state:normalized,reason}}));
+  if((reason==='bootstrap'||reason==='server')&&documentRoot){
+    requestAnimationFrame(()=>requestAnimationFrame(()=>documentRoot.classList.remove('pf-booting')));
+  }
+  return normalized;
+}
+function replay(source,items){let state=normalizeState(source);for(const item of array(items))state=applyAction(state,item.action,item.data,item.id);return state}
+function beforeFor(state,action,id){
+  const numericId=Number(id),index=state.shoots.findIndex(item=>Number(item.id)===numericId);
+  if(action==='updateShoot'||action==='deleteShoot')return{shoot:index>=0?state.shoots[index]:null,index};
+  if(action==='savePreferences')return{profile:state.profile,types:state.types,reminders:state.reminders,deliveryReminder:state.deliveryReminder};
+  return null;
+}
+function rollbackItem(source,item){
+  const state=normalizeState(source),before=item?.before;
+  if(item?.action==='createShoot')return applyAction(state,'deleteShoot',{},Number(item?.data?.__offlineId));
+  if(item?.action==='createClient'){state.clients=state.clients.filter(client=>Number(client.id)!==Number(item?.data?.__offlineId));return state}
+  if((item?.action==='updateShoot'||item?.action==='deleteShoot')&&before?.shoot){
+    const without=state.shoots.filter(shoot=>Number(shoot.id)!==Number(before.shoot.id)),at=Math.max(0,Math.min(numeric(before.index,without.length),without.length));
+    without.splice(at,0,normalizeShoot(before.shoot));state.shoots=without;return state;
+  }
+  if(item?.action==='savePreferences'&&before){state.profile=before.profile;state.types=before.types;state.reminders=before.reminders;state.deliveryReminder=before.deliveryReminder;return state}
+  return state;
+}
+function prepareQueue(action,data,id,state){
+  let items=queue(),payload=data&&typeof data==='object'?{...data}:{},numericId=Number(id),focusKey='';
+  if(action==='createShoot'){
+    const temp=-Math.max(Date.now(),...state.shoots.filter(item=>Number(item.id)<0).map(item=>Math.abs(Number(item.id))+1),1);
+    payload={...payload,timeline:arrivalTimeline(payload.startAt),__offlineId:temp};focusKey=queueKey('create');items.push({key:focusKey,action,data:payload,before:null});
+    return{items,payload,id:temp,focusKey,localAction:'createShoot'};
+  }
+  if(action==='createClient'){
+    const temp=-Math.max(Date.now(),...state.clients.filter(item=>Number(item.id)<0).map(item=>Math.abs(Number(item.id))+1),1);
+    payload={...payload,__offlineId:temp};focusKey=queueKey('client');items.push({key:focusKey,action,data:payload,before:null});
+    return{items,payload,id:temp,focusKey,localAction:'createClient'};
+  }
+  if(action==='updateShoot'&&numericId<0){
+    const index=items.findIndex(item=>item?.action==='createShoot'&&Number(item?.data?.__offlineId)===numericId);
+    if(index>=0){items=[...items];items[index]={...items[index],data:{...items[index].data,...payload,__offlineId:numericId}};return{items,payload,id:numericId,focusKey:items[index].key,localAction:action}}
+  }
+  if(action==='deleteShoot'&&numericId<0){
+    items=items.filter(item=>!(item?.action==='createShoot'&&Number(item?.data?.__offlineId)===numericId)&&Number(item?.id)!==numericId);
+    return{items,payload,id:numericId,focusKey:'',localAction:action,localOnly:true};
+  }
+  if(action==='updateShoot'&&Number.isFinite(numericId)){
+    const index=items.findIndex(item=>item?.action==='updateShoot'&&Number(item?.id)===numericId);
+    if(index>=0){items=[...items];items[index]={...items[index],data:{...(items[index].data||{}),...payload}};return{items,payload,id:numericId,focusKey:items[index].key,localAction:action}}
+  }
+  if(action==='deleteShoot'&&Number.isFinite(numericId))items=items.filter(item=>!(item?.action==='updateShoot'&&Number(item?.id)===numericId));
+  if(action==='savePreferences'){
+    const index=items.findIndex(item=>item?.action==='savePreferences');
+    if(index>=0){items=[...items];items[index]={...items[index],data:{...(items[index].data||{}),...payload}};return{items,payload,id,focusKey:items[index].key,localAction:action}}
+  }
+  focusKey=queueKey(action);items.push({key:focusKey,action,data:payload,id:Number.isFinite(numericId)&&numericId>0?numericId:void 0,before:beforeFor(state,action,numericId)});
+  return{items,payload,id:numericId,focusKey,localAction:action};
+}
+async function parseResponse(response){
+  let body=null;try{body=await response.clone().json()}catch{}
+  return{response,body,full:validState(body)?normalizeState(body):null,shoot:body?.shoot&&typeof body.shoot==='object'?body.shoot:null,client:body?.client&&typeof body.client==='object'?body.client:null};
+}
+async function fetchTimed(url,options={},timeout=5000){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
+  try{return await fetch(url,{...options,signal:controller.signal})}finally{clearTimeout(timer)}
+}
+function retryable(response){return !response||response.status===404||response.status===405||response.status===408||response.status===429||response.status>=500}
+let syncPromise=null;
+async function syncQueue(){
+  if(syncPromise)return syncPromise;
+  syncPromise=(async()=>{
+    const failed=new Map();
+    while(navigator.onLine){
+      let items=queue();if(!items.length)break;const item=items[0];let parsed=null;
+      try{
+        const requestData={...(item.data||{})};delete requestData.__offlineId;
+        const response=await fetchTimed('/api/crm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:item.action,data:requestData,id:item.id&&Number(item.id)>0?Number(item.id):void 0})});
+        parsed=await parseResponse(response);
+        if(!response.ok){
+          if(retryable(response))break;
+          const message=parsed.body?.error||'Сервер отклонил изменение';emitState(rollbackItem(snap(),item),'rollback');items=items.filter(entry=>entry.key!==item.key);queueWrite(items);failed.set(item.key,message);window.dispatchEvent(new CustomEvent('photoflow:sync-error',{detail:{message}}));continue;
+        }
+        const responseId=Number(parsed.body?.id),createdId=(item.action==='createShoot'||item.action==='createClient')&&Number.isFinite(responseId)&&responseId>0,
+          validShoot=!!parsed.shoot&&(item.action!=='createShoot'||Number.isFinite(Number(parsed.shoot.id))&&Number(parsed.shoot.id)>0),
+          validClient=!!parsed.client&&(item.action!=='createClient'||Number.isFinite(Number(parsed.client.id))&&Number(parsed.client.id)>0),
+          acceptsBare=parsed.body?.ok===true&&item.action!=='createShoot'&&item.action!=='createClient';
+        if(!parsed.full&&!validShoot&&!validClient&&!createdId&&!acceptsBare){
+          const message='Сервер вернул некорректный ответ';emitState(rollbackItem(snap(),item),'rollback');items=items.filter(entry=>entry.key!==item.key);queueWrite(items);failed.set(item.key,message);window.dispatchEvent(new CustomEvent('photoflow:sync-error',{detail:{message}}));continue;
+        }
+      }catch{break}
+      items=queue().filter(entry=>entry.key!==item.key);let state=parsed.full||normalizeState(snap()),serverShoot=null;
+      if(item.action==='createShoot'){
+        const temp=Number(item.data?.__offlineId);
+        if(parsed.shoot)serverShoot=normalizeShoot({...item.data,...parsed.shoot});
+        if(!serverShoot&&Number.isFinite(Number(parsed.body?.id))&&Number(parsed.body.id)>0)serverShoot=normalizeShoot({...item.data,id:Number(parsed.body.id)});
+        if(!serverShoot&&parsed.full)serverShoot=parsed.full.shoots.find(shoot=>Number(shoot.id)>0&&shoot.clientName===item.data?.clientName&&shoot.startAt===item.data?.startAt&&shoot.type===item.data?.type)||null;
+        if(serverShoot){
+          if(!parsed.full)state.shoots=state.shoots.map(shoot=>Number(shoot.id)===temp?serverShoot:shoot);
+          items=items.map(entry=>({...entry,id:Number(entry.id)===temp?serverShoot.id:entry.id,data:{...(entry.data||{}),__offlineId:Number(entry.data?.__offlineId)===temp?serverShoot.id:entry.data?.__offlineId}}));
+        }
+      }else if(item.action==='createClient'){
+        const temp=Number(item.data?.__offlineId);let serverClient=parsed.client?{...item.data,...parsed.client}:null;
+        if(!serverClient&&Number.isFinite(Number(parsed.body?.id))&&Number(parsed.body.id)>0)serverClient={...item.data,id:Number(parsed.body.id)};
+        if(!serverClient&&parsed.full)serverClient=parsed.full.clients.find(client=>Number(client.id)>0&&client.name===item.data?.name&&String(client.phone||'')===String(item.data?.phone||''))||null;
+        if(serverClient){
+          if(!parsed.full)state.clients=state.clients.map(client=>Number(client.id)===temp?serverClient:client);
+          state.shoots=state.shoots.map(shoot=>Number(shoot.clientId)===temp?{...shoot,clientId:Number(serverClient.id)}:shoot);
+          items=items.map(entry=>({...entry,data:{...(entry.data||{}),clientId:Number(entry.data?.clientId)===temp?Number(serverClient.id):entry.data?.clientId}}));
+        }
+      }else if(item.action==='updateShoot'&&parsed.shoot&&!parsed.full)state.shoots=state.shoots.map(shoot=>Number(shoot.id)===Number(item.id)?normalizeShoot({...shoot,...parsed.shoot,id:shoot.id}):shoot);
+      queueWrite(items);state=replay(state,items);emitState(state,'server');
+    }
+    return{failed,items:queue(),state:normalizeState(snap())};
+  })().finally(()=>{syncPromise=null});
+  return syncPromise;
+}
+async function mutate(action,data={},id){
+  const state=normalizeState(snap()),prepared=prepareQueue(action,data,id,state),next=applyAction(state,prepared.localAction,prepared.payload,prepared.id);
+  queueWrite(prepared.items);emitState(next,'optimistic');
+  if(prepared.localOnly||!navigator.onLine)return{ok:true,queued:!prepared.localOnly,state:next};
+  const pending=syncQueue(),quick=await Promise.race([pending.then(result=>({done:true,result})),new Promise(resolve=>setTimeout(()=>resolve({done:false}),650))]);
+  if(!quick.done)return{ok:true,queued:true,state:next};
+  const result=quick.result,error=result.failed.get(prepared.focusKey);
+  return{ok:!error,queued:result.items.some(item=>item.key===prepared.focusKey),state:result.state,error};
+}
+async function bootstrap(fallback={}){
+  queueWrite(queue());const stored=read(SNAP,null),initial=normalizeState(stored&&typeof stored==='object'?stored:fallback,fallback);emitState(replay(initial,queue()),'bootstrap');
+  if(!navigator.onLine)return normalizeState(snap());
+  await syncQueue();if(queue().length)return normalizeState(snap());
+  try{
+    const response=await fetchTimed('/api/crm',{headers:{accept:'application/json'}}),parsed=await parseResponse(response);
+    if(response.ok&&parsed.full)return emitState(parsed.full,'server');
+  }catch{}
+  return normalizeState(snap());
+}
+window.PhotoFlowData={getState:()=>normalizeState(snap()),normalizeState,mutate,sync:syncQueue,bootstrap,validState};
+function installVisualViewport(){
+  const root=document.documentElement,viewport=window.visualViewport;
+  if(!root)return;
+  let frame=0;
+  const update=()=>{
+    cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{
+      const height=viewport?.height||window.innerHeight,top=viewport?.offsetTop||0,keyboard=Math.max(0,window.innerHeight-height-top);
+      root.style.setProperty('--pf-viewport-height',`${Math.round(height)}px`);
+      root.style.setProperty('--pf-viewport-top',`${Math.round(top)}px`);
+      root.style.setProperty('--pf-keyboard-inset',`${Math.round(keyboard)}px`);
+      const active=document.activeElement;
+      if(keyboard>100&&active?.closest?.('.modal-form'))active.scrollIntoView({block:'center',inline:'nearest'});
+    });
+  };
+  viewport?.addEventListener('resize',update,{passive:true});viewport?.addEventListener('scroll',update,{passive:true});window.addEventListener('orientationchange',update,{passive:true});
+  document.addEventListener('focusin',event=>{if(event.target?.closest?.('.modal-form'))setTimeout(update,80)},{passive:true});
+  document.addEventListener('focusout',event=>{if(event.target?.closest?.('.modal-form'))setTimeout(update,120)},{passive:true});
+  update();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installVisualViewport,{once:true});else installVisualViewport();
 function currentShoot(){
   const state=snap(),mode=document.querySelector('.day-mode');
   if(!mode)return null;
@@ -52,16 +267,8 @@ function renderTemplate(template,shoot){
 }
 async function saveShoot(shoot,data){
   if(!shoot)return false;
-  try{
-    const r=await fetch('/api/crm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'updateShoot',id:shoot.id,data})});
-    if(!r.ok)return false;
-    let server=null;try{server=await r.json()}catch{}
-    if(server&&Array.isArray(server.shoots))write(SNAP,server);
-    else{
-      const state=snap();state.shoots=(state.shoots||[]).map(x=>Number(x.id)===Number(shoot.id)?{...x,...data}:x);write(SNAP,state);
-    }
-    return true;
-  }catch{return false}
+  const result=await window.PhotoFlowData.mutate('updateShoot',data,shoot.id);
+  return !!result.ok;
 }
 function ensureStyle(){
   if(document.getElementById('pf-runtime-v2-style'))return;
@@ -82,13 +289,6 @@ function ensureStyle(){
   @media(max-width:480px){.pf-add-fields .pf-time{flex-basis:92px!important;width:92px!important;min-width:92px!important}.pf-edit-action{font-size:10.5px!important}}
   `;document.head.appendChild(s);
 }
-function cleanup(){
-  const removed=/^(Погода и свет|Резервные копии)$/i;
-  document.querySelectorAll('.day-weather,.weather-card,.backup-card,.day-backup').forEach(el=>el.remove());
-  document.querySelectorAll('.day-mode section').forEach(section=>{const label=(section.querySelector('span,strong,h2,h3')?.textContent||'').trim();if(removed.test(label))section.remove()});
-  document.querySelectorAll('.risk-grid button').forEach(btn=>{if(!/не получено/i.test((btn.textContent||'').replace(/\s+/g,' ')))btn.remove()});
-  document.querySelectorAll('.shoot-list-panel .danger-link,.panel-actions .danger-link').forEach(el=>el.remove());
-}
 function installSwipe(row,reveal,onOpen){
   let sx=0,sy=0,dx=0,active=false,open=false,moved=false;
   row.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;dx=open?-reveal:0;active=true;moved=false},{passive:true});
@@ -104,6 +304,11 @@ function wrapEdit(row,onEdit,onDelete){
   actions.querySelector('.delete').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();onDelete()});
   return swiped;
 }
+function hintEditSwipe(row,key,index){
+  if(index!==0)return;try{if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1')}catch{}
+  setTimeout(()=>{if(row.isConnected)row.classList.add('pf-swipe-hint')},180);
+  setTimeout(()=>row.classList.remove('pf-swipe-hint'),1150);
+}
 function renderTimeline(container){
   const shoot=currentShoot();if(!shoot||!container)return;
   const fresh=snap().shoots?.find(s=>Number(s.id)===Number(shoot.id))||shoot;
@@ -111,7 +316,7 @@ function renderTimeline(container){
   container.dataset.pfRuntime='timeline';container.classList.add('pf-owned-editor');
   container.innerHTML=`${items.map(i=>`<button type="button" class="pf-owned-row timeline ${i.done?'done':''}" data-id="${esc(i.id)}"><time>${esc(i.time||'')}</time><span class="pf-dot"></span><span class="pf-label">${esc(i.label||'')}</span></button>`).join('')}<div class="pf-add-box"><div class="pf-add-fields"><input class="pf-time" type="time" value="10:00" aria-label="Время этапа"><input class="pf-label-input" type="text" placeholder="Название этапа" aria-label="Название этапа"></div><button type="button" class="pf-add-btn">+ Добавить этап</button><button type="button" class="pf-edit-cancel">Отменить редактирование</button></div>`;
   const box=container.querySelector('.pf-add-box'),time=container.querySelector('.pf-time'),label=container.querySelector('.pf-label-input'),add=container.querySelector('.pf-add-btn'),cancel=container.querySelector('.pf-edit-cancel');
-  container.querySelectorAll('.pf-owned-row').forEach(row=>{
+  container.querySelectorAll('.pf-owned-row').forEach((row,index)=>{
     const id=row.dataset.id;
     const swiped=wrapEdit(row,()=>{
       const cur=snap().shoots?.find(s=>Number(s.id)===Number(shoot.id))||fresh,it=(cur.timeline||[]).find(x=>String(x.id)===String(id));if(!it)return;
@@ -119,6 +324,7 @@ function renderTimeline(container){
     },async()=>{
       const cur=snap().shoots?.find(s=>Number(s.id)===Number(shoot.id))||fresh,next=(cur.timeline||[]).filter(x=>String(x.id)!==String(id));if(await saveShoot(cur,{timeline:next}))renderTimeline(container);
     });
+    hintEditSwipe(row,'photoflow:timeline-swipe-hint:v1',index);
     row.addEventListener('click',async e=>{if(swiped())return;const cur=snap().shoots?.find(s=>Number(s.id)===Number(shoot.id))||fresh,next=(cur.timeline||[]).map(x=>String(x.id)===String(id)?{...x,done:!x.done}:x);if(await saveShoot(cur,{timeline:next}))renderTimeline(container)});
   });
   add.addEventListener('click',async()=>{
@@ -140,9 +346,10 @@ async function renderTech(){
   const done=items.filter(x=>x.done).length;
   panel.innerHTML=`<div class="pf-tech-progress"><span>${done} из ${items.length}</span><i><b style="width:${items.length?done/items.length*100:0}%"></b></i></div>${items.map(i=>`<button type="button" class="pf-owned-row pf-tech-row ${i.done?'done':''}" data-id="${esc(i.id)}"><span class="pf-tech-check">${i.done?'✓':''}</span><span class="pf-label">${esc(i.label||'')}</span></button>`).join('')}<div class="pf-tech-add"><input class="pf-tech-input" type="text" placeholder="Техника или аксессуар"><button type="button" class="pf-tech-save">+ Добавить</button><button type="button" class="pf-edit-cancel">Отменить редактирование</button></div>`;
   const addBox=panel.querySelector('.pf-tech-add'),input=panel.querySelector('.pf-tech-input'),save=panel.querySelector('.pf-tech-save'),cancel=panel.querySelector('.pf-edit-cancel');
-  panel.querySelectorAll('.pf-tech-row').forEach(row=>{
+  panel.querySelectorAll('.pf-tech-row').forEach((row,index)=>{
     const id=row.dataset.id;
     const swiped=wrapEdit(row,()=>{const cur=snap().shoots?.find(s=>Number(s.id)===Number(shoot.id))||fresh,it=(cur.equipment||[]).find(x=>String(x.id)===String(id));if(!it)return;addBox.dataset.editId=String(id);addBox.classList.add('pf-editing');input.value=it.label||'';save.textContent='Сохранить изменения';setTimeout(()=>input.focus({preventScroll:true}),0)},async()=>{const cur=snap().shoots?.find(s=>Number(s.id)===Number(shoot.id))||fresh,next=(cur.equipment||[]).filter(x=>String(x.id)!==String(id));if(await saveShoot(cur,{equipment:next}))renderTech()});
+    hintEditSwipe(row,'photoflow:equipment-swipe-hint:v1',index);
     row.addEventListener('click',async()=>{if(swiped())return;const cur=snap().shoots?.find(s=>Number(s.id)===Number(shoot.id))||fresh,next=(cur.equipment||[]).map(x=>String(x.id)===String(id)?{...x,done:!x.done}:x);if(await saveShoot(cur,{equipment:next}))renderTech()});
   });
   save.addEventListener('click',async()=>{const value=input.value.trim();if(!value){input.focus();return}const cur=snap().shoots?.find(s=>Number(s.id)===Number(shoot.id))||fresh,editId=addBox.dataset.editId||'',next=editId?(cur.equipment||[]).map(x=>String(x.id)===editId?{...x,label:value}:x):[...(cur.equipment||[]),{id:`eq-${Date.now()}`,label:value,done:false}];save.disabled=true;if(await saveShoot(cur,{equipment:next}))renderTech();else save.disabled=false});
@@ -156,7 +363,6 @@ function showTab(kind){
   if(techOn){if(timeline){timeline.hidden=true;timeline.style.display='none'}renderTech()}
   else{if(panel){panel.hidden=true;panel.style.display='none'}if(timeline){timeline.hidden=false;timeline.style.display='';if(timeline.dataset.pfRuntime!=='timeline')renderTimeline(timeline)}}
 }
-function tabHandler(e){const btn=e.target?.closest?.('.day-tabs button');if(!btn)return;const t=(btn.textContent||'').trim();if(t!=='Тайминг'&&t!=='Техника')return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();showTab(t==='Техника'?'tech':'timeline')}
 function closeSmart(){document.querySelector('.pf-smart-modal-bg')?.remove()}
 function openSmartModal(item){
   closeSmart();const isCustom=item?.kind==='custom',isBuiltin=item?.kind==='builtin';
@@ -170,9 +376,9 @@ function openSmartModal(item){
     const newTitle=title.value.trim(),template=text.value.trim();if(!newTitle||!template)return;
     if(isBuiltin){const o=read(OVERRIDES,{});o[item.title]=template;write(OVERRIDES,o)}
     else{const all=read(CUSTOM,[]);if(isCustom){const idx=all.findIndex(x=>String(x.id)===String(item.id));if(idx>=0)all[idx]={...all[idx],title:newTitle,text:template}}else all.push({id:`sm-${Date.now()}`,title:newTitle,text:template});write(CUSTOM,all)}
-    closeSmart();patchSmart();
+    closeSmart();window.dispatchEvent(new CustomEvent('photoflow:smart-changed'));patchSmart();
   };
-  bg.querySelector('.pf-smart-delete')?.addEventListener('click',()=>{if(!isCustom)return;const all=read(CUSTOM,[]).filter(x=>String(x.id)!==String(item.id));write(CUSTOM,all);closeSmart();patchSmart()});
+  bg.querySelector('.pf-smart-delete')?.addEventListener('click',()=>{if(!isCustom)return;const all=read(CUSTOM,[]).filter(x=>String(x.id)!==String(item.id));write(CUSTOM,all);closeSmart();window.dispatchEvent(new CustomEvent('photoflow:smart-changed'));patchSmart()});
 }
 function sendText(text){if(navigator.share)return navigator.share({text}).catch(()=>{});if(navigator.clipboard)return navigator.clipboard.writeText(text).catch(()=>{})}
 function articleTitle(article){return (article.querySelector('h1,h2,h3,strong')?.textContent||'').trim()}
@@ -185,13 +391,18 @@ function patchSmart(){
   });
   custom.forEach(item=>{const a=document.createElement('article');a.dataset.pfCustom='1';a.innerHTML='<strong></strong><p></p><div><button type="button">Редактировать</button><button type="button">Отправить</button></div>';a.querySelector('strong').textContent=item.title;a.querySelector('p').textContent=renderTemplate(item.text,shoot);const [edit,send]=a.querySelectorAll('button');edit.onclick=()=>openSmartModal({kind:'custom',id:item.id,title:item.title,template:item.text});send.onclick=()=>sendText(renderTemplate(item.text,shoot));section.appendChild(a)});
 }
+window.PhotoFlowSmart={
+  create:()=>openSmartModal(null),
+  editBuiltin:title=>openSmartModal({kind:'builtin',title,template:read(OVERRIDES,{})[title]||DEFAULT_SMART[title]||''}),
+  render:(title,shoot)=>renderTemplate(read(OVERRIDES,{})[title]||DEFAULT_SMART[title]||'',shoot),
+  sendBuiltin:(title,renderedText)=>sendText(renderedText||renderTemplate(read(OVERRIDES,{})[title]||DEFAULT_SMART[title]||'',currentShoot()))
+};
 function patchEditors(){const mode=document.querySelector('.day-mode');if(!mode)return;const timeline=mode.querySelector('.day-timeline');if(timeline&&timeline.dataset.pfRuntime!=='timeline')renderTimeline(timeline);const active=[...mode.querySelectorAll('.day-tabs button')].find(b=>b.classList.contains('active'))?.textContent?.trim();if(active==='Техника')renderTech()}
-function patch(){ensureStyle();cleanup();patchEditors();patchSmart()}
+function patch(){ensureStyle();patchEditors();patchSmart()}
 let timer=0;function schedule(delay=30){clearTimeout(timer);timer=setTimeout(()=>requestAnimationFrame(patch),delay)}
-function lifecycleClick(e){
-  const btn=e.target?.closest?.('button,a');if(!btn)return;const t=(btn.textContent||'').trim();
-  if(t==='Открыть проект'||t==='Тайминг'||t==='Техника'||t==='+'||/Показать|не получено|Мои съёмки|Календарь|Клиенты|Финансы|Настройки|Профиль/.test(t)){schedule(30);setTimeout(()=>schedule(0),160)}
-}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>schedule(0),{once:true});else schedule(0);
-document.addEventListener('click',tabHandler,true);document.addEventListener('click',lifecycleClick,true);window.addEventListener('pageshow',()=>schedule(0));document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule(0)});
+window.addEventListener('pageshow',()=>schedule(0));
+window.addEventListener('photoflow:state-changed',()=>schedule(0));
+window.addEventListener('photoflow:shoot-opened',()=>schedule(0));
+window.addEventListener('photoflow:shoot-tab',event=>showTab(event.detail?.tab==='gear'?'tech':'timeline'));
 })();
