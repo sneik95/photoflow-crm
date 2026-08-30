@@ -2,7 +2,6 @@
 const SNAP='fotocrm:snapshot:v2';
 const HINT='photoflow:balance-swipe-hint:v1';
 const read=(k=SNAP,f={})=>{try{const v=JSON.parse(localStorage.getItem(k)||'null');return v??f}catch{return f}};
-const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch{return false}};
 const money=n=>Number(n||0).toLocaleString('ru-RU');
 const date=iso=>{const d=new Date(iso||'');return Number.isFinite(d.getTime())?d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'}):''};
 const unpaid=()=>{const s=read();return (Array.isArray(s.shoots)?s.shoots:[]).filter(x=>Number(x.price||0)>Number(x.paidAmount||0))};

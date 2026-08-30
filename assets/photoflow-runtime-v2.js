@@ -198,7 +198,8 @@ async function mutate(action,data={},id){
   const state=normalizeState(snap()),prepared=prepareQueue(action,data,id,state),next=applyAction(state,prepared.localAction,prepared.payload,prepared.id);
   queueWrite(prepared.items);emitState(next,'optimistic');
   if(prepared.localOnly||!navigator.onLine)return{ok:true,queued:!prepared.localOnly,state:next};
-  const pending=syncQueue(),quick=await Promise.race([pending.then(result=>({done:true,result})),new Promise(resolve=>setTimeout(()=>resolve({done:false}),650))]);
+  const pending=syncQueue(),confirmationWindow=action==='createShoot'||action==='createClient'?5200:650,
+    quick=await Promise.race([pending.then(result=>({done:true,result})),new Promise(resolve=>setTimeout(()=>resolve({done:false}),confirmationWindow))]);
   if(!quick.done)return{ok:true,queued:true,state:next};
   const result=quick.result,error=result.failed.get(prepared.focusKey);
   return{ok:!error,queued:result.items.some(item=>item.key===prepared.focusKey),state:result.state,error};

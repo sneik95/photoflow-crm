@@ -280,6 +280,22 @@ async function testInvalidSuccessBodyIsNotAccepted() {
   assert.equal(queueOf(environment).length, 0);
 }
 
+async function testSlowPermanentCreateFailureRollsBackBeforeReturn() {
+  const environment = createEnvironment({
+    online: true,
+    fetchImpl: async (url, init) => {
+      if (!init?.method) return jsonResponse(fallback);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return jsonResponse({ error: 'Client data rejected' }, 422);
+    },
+  });
+  await environment.PhotoFlowData.bootstrap(fallback);
+  const created = await environment.PhotoFlowData.mutate('createShoot', shootInput);
+  assert.equal(created.ok, false, 'create must wait for a definitive server rejection instead of closing the form');
+  assert.equal(environment.PhotoFlowData.getState().shoots.length, 0);
+  assert.equal(queueOf(environment).length, 0);
+}
+
 async function testRetryableApiFailureStaysLocal() {
   const environment = createEnvironment({
     online: true,
@@ -324,6 +340,7 @@ async function testLegacyDestructiveQueueEntriesAreRemoved() {
   await testQueuedClientAndShootReconciliation();
   await testPermanentFailuresRollback();
   await testInvalidSuccessBodyIsNotAccepted();
+  await testSlowPermanentCreateFailureRollsBackBeforeReturn();
   await testRetryableApiFailureStaysLocal();
   await testInvalidGetDoesNotEraseSnapshot();
   await testLegacyDestructiveQueueEntriesAreRemoved();
