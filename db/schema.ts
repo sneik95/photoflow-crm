@@ -58,7 +58,6 @@ export const shoots = sqliteTable(
     equipmentJson: text("equipment_json").notNull().default("[]"),
     shotListJson: text("shot_list_json").notNull().default("[]"),
     timelineJson: text("timeline_json").notNull().default("[]"),
-    backupStatus: text("backup_status").notNull().default("none"),
     portalToken: text("portal_token").notNull().default(""),
     clientGuide: text("client_guide").notNull().default(""),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),

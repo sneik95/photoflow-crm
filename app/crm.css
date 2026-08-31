@@ -559,7 +559,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
 }
 .day-time-row strong { letter-spacing: -.045em; }
-.day-status-strip,
 .day-checklist,
 .day-timeline,
 .day-tabs { background: linear-gradient(145deg, rgba(255,255,255,.04), rgba(255,255,255,.012)); }
@@ -792,9 +791,6 @@ button:active > .liquid-icon { transform: scale(.95); }
 .portal-countdown > span,
 .portal-error > span,
 .weekdays span,
-.day-status-strip button i,
-.day-status-strip button span,
-.weather-footer a,
 .sync-indicator,
 .offline-indicator {
   font-size: var(--type-micro);
@@ -833,14 +829,10 @@ button:active > .liquid-icon { transform: scale(.95); }
 .recognition-actions button,
 .recognition-actions label,
 .day-time-row span,
-.weather-details,
-.weather-footer small,
-.weather-footer button,
 .day-contacts small,
 .checklist-progress,
 .day-timeline time,
 .day-timeline button > b,
-.backup-buttons button,
 .smart-messages article button,
 .project-fields label > span,
 .portal-topbar,
@@ -885,8 +877,7 @@ button:active > .liquid-icon { transform: scale(.95); }
 .day-economics > button,
 .project-details summary,
 .smart-messages article button,
-.backup-buttons button,
-.weather-footer button {
+.smart-messages article button {
   font-size: var(--type-control);
   line-height: 1.35;
 }

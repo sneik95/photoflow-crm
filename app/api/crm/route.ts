@@ -7,8 +7,8 @@ import {
   INITIAL_SHOOTS,
   defaultEquipment,
   defaultShotList,
-  defaultTimeline,
 } from "../../crm-data";
+import { initialShootTimeline } from "../../crm-new-shoot";
 
 const DEMO_OWNER = "demo@fotocrm.local";
 
@@ -37,7 +37,7 @@ function safeReminders(value: string) {
 function safeList<T>(value: string, fallback: T[]) {
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) && parsed.length ? (parsed as T[]) : fallback;
+    return Array.isArray(parsed) ? (parsed as T[]) : fallback;
   } catch {
     return fallback;
   }
@@ -136,7 +136,6 @@ async function snapshot(owner: string) {
           equipmentJson: JSON.stringify(demo.equipment),
           shotListJson: JSON.stringify(demo.shotList),
           timelineJson: JSON.stringify(demo.timeline),
-          backupStatus: demo.backupStatus,
           clientGuide: demo.clientGuide,
         };
         await db
@@ -156,17 +155,12 @@ async function snapshot(owner: string) {
           .where(and(eq(shoots.owner, owner), eq(shoots.id, row.id)));
       }
       const { equipmentJson, shotListJson, timelineJson, ...shoot } = row;
-      const startTime = row.startAt.slice(11, 16) || "10:00";
-      const endTime = row.endAt.slice(11, 16) || "12:00";
       return {
         ...shoot,
         portalToken: token,
-        equipment: safeList(equipmentJson, defaultEquipment(row.type)),
+        equipment: safeList(equipmentJson, []),
         shotList: safeList(shotListJson, defaultShotList(row.type)),
-        timeline: safeList(
-          timelineJson,
-          defaultTimeline(startTime, endTime, row.type),
-        ),
+        timeline: safeList(timelineJson, []),
       };
     }),
   );
@@ -321,20 +315,9 @@ export async function POST(request: Request) {
         editingHours: Math.max(0, Number(data.editingHours) || 0),
         travelCost: Math.max(0, Number(data.travelCost) || 0),
         otherCosts: Math.max(0, Number(data.otherCosts) || 0),
-        equipmentJson: JSON.stringify(data.equipment || defaultEquipment(type)),
+        equipmentJson: JSON.stringify(Array.isArray(data.equipment) ? data.equipment : defaultEquipment(type)),
         shotListJson: JSON.stringify(data.shotList || defaultShotList(type)),
-        timelineJson: JSON.stringify(
-          data.timeline ||
-            defaultTimeline(
-              String(data.startAt).slice(11, 16),
-              String(data.endAt).slice(11, 16),
-              type,
-            ),
-        ),
-        backupStatus:
-          data.backupStatus === "one" || data.backupStatus === "two"
-            ? data.backupStatus
-            : "none",
+        timelineJson: JSON.stringify(Array.isArray(data.timeline) ? data.timeline : initialShootTimeline(String(data.startAt))),
         portalToken: portalToken(),
         clientGuide: String(data.clientGuide || ""),
       }).returning({ id: shoots.id, clientId: shoots.clientId });
@@ -390,13 +373,6 @@ export async function POST(request: Request) {
       }
       if (Array.isArray(data.timeline)) {
         allowed.timelineJson = JSON.stringify(data.timeline);
-      }
-      if (
-        data.backupStatus === "none" ||
-        data.backupStatus === "one" ||
-        data.backupStatus === "two"
-      ) {
-        allowed.backupStatus = data.backupStatus;
       }
       if (typeof data.clientGuide === "string") {
         allowed.clientGuide = data.clientGuide;

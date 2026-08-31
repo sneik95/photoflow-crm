@@ -244,7 +244,6 @@ export function NewShootModal({
         equipment: defaultEquipment(typeName),
         shotList: defaultShotList(typeName),
         timeline: initialShootTimeline(`${date}T${start}`),
-        backupStatus: "none",
         portalToken: "",
         clientGuide,
       });

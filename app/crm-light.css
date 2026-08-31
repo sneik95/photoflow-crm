@@ -954,7 +954,6 @@ fieldset legend { color: var(--pf-muted); }
 .price-toggle,
 .balance,
 .panel-inset,
-.day-status-strip,
 .day-tabs,
 .day-checklist,
 .day-timeline,
@@ -989,12 +988,7 @@ fieldset legend { color: var(--pf-muted); }
 .day-time-row span { background: #edf9f5; color: var(--pf-success-ink); }
 .day-hero > a { color: var(--pf-text); }
 .day-hero > a b { color: var(--pf-accent); }
-.day-status-strip button { min-height: 48px; color: var(--pf-muted-soft); }
-.day-status-strip button.active { color: var(--pf-accent); }
-.day-status-strip button.active i { border-color: rgba(82,103,255,.34); background: var(--pf-accent-soft); }
-.weather-footer button,
 .smart-messages article button { min-height: 36px; background: var(--pf-accent-soft); color: var(--pf-accent); }
-.weather-footer a { color: var(--pf-muted); }
 .day-contacts > a { color: var(--pf-accent); }
 .day-tabs button { min-height: 44px; }
 .day-tabs button.active { background: var(--pf-accent-soft); color: var(--pf-accent); }
@@ -1006,10 +1000,105 @@ fieldset legend { color: var(--pf-muted); }
 .day-timeline time,
 .project-details summary { color: var(--pf-accent); }
 .day-timeline button > i { border-color: var(--pf-accent); box-shadow: 0 0 0 4px #fff; }
-.backup-buttons button { min-height: 38px; border-color: var(--pf-border); background: #fff; }
-.backup-buttons button.active { border-color: rgba(61,159,125,.3); background: #edf9f5; color: var(--pf-success-ink); }
 .portal-card { border-color: rgba(82,103,255,.2); background: linear-gradient(135deg, var(--pf-accent-soft), #fff); }
 .day-economics strong { color: var(--pf-accent); }
+
+/* Shooting mode managers */
+.project-manager { display: grid; gap: 10px; min-width: 0; }
+.project-manager-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.project-manager-heading > span { color: var(--pf-text); font-size: 18px; font-weight: 750; }
+.project-manager-heading > button,
+.smart-message-add {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--pf-accent);
+  font-size: 15px;
+  font-weight: 750;
+}
+.smart-message-add { min-width: 44px; font-size: 27px; line-height: 1; }
+.project-entry-form,
+.smart-message-editor {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--pf-border);
+  border-radius: 16px;
+  background: var(--pf-card-soft);
+}
+.project-entry-form label,
+.smart-message-editor label { display: grid; gap: 6px; color: var(--pf-muted); font-size: 13px; }
+.project-entry-form input,
+.smart-message-editor input,
+.smart-message-editor textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--pf-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--pf-text);
+  font-size: 16px;
+}
+.project-entry-form input[type="time"] { -webkit-appearance: none; }
+.smart-message-editor textarea { min-height: 148px; resize: vertical; }
+.project-entry-form > div { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.project-entry-form .button { min-height: 44px; }
+.project-list { overflow: hidden; border-radius: 17px; }
+.project-empty { margin: 0; padding: 16px; color: var(--pf-muted); font-size: 14px; }
+.project-swipe-shell { position: relative; overflow: hidden; }
+.project-swipe-actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 178px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 6px;
+  background: #eef2ff;
+}
+.project-swipe-actions button {
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 5px;
+  border: 0;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.project-swipe-edit { background: #dfe5ff; color: #3e55d8; }
+.project-swipe-delete { background: #ffe6df; color: #b94e3b; }
+.project-swipe-surface {
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y;
+  background: #fff;
+  transition: transform .24s cubic-bezier(.22, 1, .36, 1);
+  will-change: transform;
+}
+.project-swipe-surface.swipe-hint { transition-timing-function: cubic-bezier(.22, 1.35, .36, 1); }
+.project-check-row {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 11px;
+  align-items: center;
+  padding: 13px 15px;
+  border-top: 1px solid var(--pf-border);
+  background: #fff;
+  color: var(--pf-text);
+}
+.project-check-row input { position: absolute; opacity: 0; pointer-events: none; }
+.project-check-row > i { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid rgba(82,103,255,.38); border-radius: 7px; color: transparent; font-style: normal; font-weight: 800; }
+.project-check-row.done { color: var(--pf-muted); }
+.project-check-row.done > span { text-decoration: line-through; }
+.project-check-row.done > i { border-color: var(--pf-success); background: var(--pf-success); color: var(--pf-success-ink); }
+.smart-variable-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.smart-variable-chips button { min-height: 36px; padding: 7px 9px; border: 1px solid rgba(82,103,255,.16); border-radius: 10px; background: var(--pf-accent-soft); color: var(--pf-accent); font-size: 13px; }
+.smart-message-editor { min-height: 100%; padding: 22px 24px calc(28px + env(safe-area-inset-bottom)); background: var(--pf-bg); overflow-y: auto; }
 
 /* Client portal, notifications and states */
 .client-portal-shell {

@@ -66,7 +66,6 @@ export type Shoot = {
   equipment: CheckItem[];
   shotList: CheckItem[];
   timeline: TimelineItem[];
-  backupStatus: "none" | "one" | "two";
   portalToken: string;
   clientGuide: string;
 };
@@ -142,7 +141,6 @@ export const INITIAL_SHOOTS: Shoot[] = [
     equipment: defaultEquipment("Портрет"),
     shotList: defaultShotList("Портрет"),
     timeline: defaultTimeline("12:00", "14:00", "Портрет"),
-    backupStatus: "one",
     portalToken: "",
     clientGuide: "Возьмите два образа и удобную обувь для прогулки.",
   },
@@ -173,7 +171,6 @@ export const INITIAL_SHOOTS: Shoot[] = [
     equipment: defaultEquipment("Свадьба"),
     shotList: defaultShotList("Свадьба"),
     timeline: defaultTimeline("14:00", "22:00", "Свадьба"),
-    backupStatus: "none",
     portalToken: "",
     clientGuide:
       "Будьте готовы за 20 минут до начала. Кольца, приглашения и детали положите рядом с платьем.",

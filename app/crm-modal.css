@@ -255,38 +255,12 @@
 .day-hero > a { min-width: 0; display: flex; justify-content: space-between; gap: 15px; color: var(--text); text-decoration: none; font-size: 13px; overflow-wrap: anywhere; }
 .day-hero > a b { color: var(--violet-2); white-space: nowrap; }
 
-.day-status-strip {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
-  padding: 11px;
-  border: 1px solid var(--border);
-  border-radius: 17px;
-  background: rgba(255,255,255,.018);
-}
-.day-status-strip button { display: grid; justify-items: center; gap: 6px; min-width: 0; padding: 5px 2px; border: 0; background: transparent; color: var(--muted-2); cursor: pointer; }
-.day-status-strip button i { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; font-size: 10px; font-style: normal; }
-.day-status-strip button span { overflow: hidden; width: 100%; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
-.day-status-strip button.active { color: var(--violet-2); }
-.day-status-strip button.active i { border-color: rgba(184,148,255,.5); background: rgba(184,148,255,.12); }
-
 .panel-inset {
   padding: 17px;
   border: 1px solid var(--border);
   border-radius: 17px;
   background: rgba(255,255,255,.022);
 }
-.day-weather { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 12px; }
-.day-weather > div:first-child { display: grid; gap: 7px; }
-.day-weather > div:first-child strong { font-size: 17px; }
-.weather-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; color: var(--muted); font-size: 11px; text-align: right; }
-.weather-details .golden { color: var(--orange); }
-.weather-footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; padding-top: 10px; border-top: 1px solid var(--border); }
-.weather-footer small { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 9px; }
-.weather-footer button { border: 0; border-radius: 8px; padding: 6px 8px; background: rgba(184,148,255,.1); color: var(--violet-2); font-size: 9px; cursor: pointer; }
-.weather-footer > span { display: flex; gap: 6px; }
-.weather-footer a { color: var(--muted-2); font-size: 8px; text-decoration: none; }
-
 .day-contacts { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; }
 .day-contacts > div { display: grid; gap: 4px; }
 .day-contacts > div:nth-of-type(2) { padding-top: 14px; border-top: 1px solid var(--border); }
@@ -314,12 +288,6 @@
 .day-timeline button > b { color: var(--green); font-size: 10px; }
 .day-timeline button.done > span { color: var(--muted); text-decoration: line-through; }
 .day-timeline button.done > i { background: var(--green); border-color: var(--green); }
-
-.backup-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 15px; }
-.backup-card > div:first-child { min-width: 0; display: grid; gap: 6px; }
-.backup-buttons { display: flex; gap: 5px; }
-.backup-buttons button { padding: 8px 9px; border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
-.backup-buttons button.active { color: var(--green); border-color: rgba(37,211,102,.35); background: rgba(37,211,102,.07); }
 
 .section-heading { display: flex; align-items: center; justify-content: space-between; }
 .section-heading small { color: var(--green); }
@@ -362,14 +330,6 @@
   }
   .day-hero { padding: 19px; }
   .day-time-row { align-items: flex-start; flex-direction: column; }
-  .day-status-strip button span { display: none; }
-  .day-weather { grid-template-columns: 1fr; }
-  .weather-details { text-align: left; }
-  .weather-footer { flex-wrap: wrap; }
-  .weather-footer small { flex-basis: calc(100% - 70px); }
-  .backup-card { grid-template-columns: minmax(0, 1fr); }
-  .backup-buttons { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .backup-buttons button { min-width: 0; }
   .portal-card > div:last-child { display: grid; }
   .day-economics { grid-template-columns: 1fr 1fr; }
   .project-fields { grid-template-columns: 1fr; }

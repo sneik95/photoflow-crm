@@ -94,7 +94,6 @@ export function downloadCrmExcel(clients: Client[], shoots: Shoot[]) {
       "Обработка, ч.",
       "Расходы на дорогу",
       "Прочие расходы",
-      "Резервные копии",
       "Памятка клиенту",
     ],
     ...shoots.map((shoot) => [
@@ -124,11 +123,6 @@ export function downloadCrmExcel(clients: Client[], shoots: Shoot[]) {
       shoot.editingHours,
       shoot.travelCost,
       shoot.otherCosts,
-      shoot.backupStatus === "two"
-        ? "2 копии"
-        : shoot.backupStatus === "one"
-          ? "1 копия"
-          : "Нет",
       shoot.clientGuide,
     ]),
   ];
