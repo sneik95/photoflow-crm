@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787231150634,
+      "tag": "0000_spooky_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787236032736,
+      "tag": "0001_colossal_rocket_raccoon",
+      "breakpoints": true
+    }
+  ]
+}
