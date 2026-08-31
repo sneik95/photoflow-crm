@@ -30,7 +30,14 @@ import {
   upcomingCount,
 } from "./crm-shoot-logic";
 import { DayModeModal } from "./crm-day-mode";
-import { Icon, Modal, PageHeader, useOneTimeSwipeHint } from "./crm-ui";
+import {
+  Icon,
+  Modal,
+  PageHeader,
+  SwipeActions,
+  useOneTimeSwipeHint,
+  useSwipeGesture,
+} from "./crm-ui";
 
 type ShootStatusFilter = ShootListFilter;
 
@@ -1004,17 +1011,26 @@ export function ClientsPage({
   clients,
   shoots,
   onAdd,
+  onEdit,
+  onDelete,
 }: {
   clients: Client[];
   shoots: Shoot[];
   onAdd: () => void;
+  onEdit?: (client: Client) => void;
+  onDelete?: (client: Client) => void;
 }) {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"all" | Client["kind"]>("all");
+  const [openClientId, setOpenClientId] = useState<number | null>(null);
   const filtered = clients.filter(
     (client) =>
       (kind === "all" || client.kind === kind) &&
       `${client.name} ${client.phone}`.toLowerCase().includes(query.toLowerCase()),
+  );
+  const swipeHint = useOneTimeSwipeHint(
+    "photoflow:clients-swipe-hint:v1",
+    filtered.length > 0,
   );
 
   return (
@@ -1052,22 +1068,19 @@ export function ClientsPage({
           const clientShoots = shoots.filter(
             (shoot) => shoot.clientId === client.id,
           );
-          return (
-            <article key={client.id}>
-              <span className="avatar">{initials(client.name)}</span>
-              <div>
-                <h3>{client.name}</h3>
-                <p>
-                  {client.phone || "нет телефона"} · {clientShoots.length} съёмок
-                </p>
-              </div>
-              <strong>
-                {money(
-                  clientShoots.reduce((sum, shoot) => sum + shoot.price, 0),
-                )}
-              </strong>
-            </article>
-          );
+          return <ClientSwipeRow
+            key={client.id}
+            client={client}
+            shootCount={clientShoots.length}
+            revenue={clientShoots.reduce((sum, shoot) => sum + shoot.price, 0)}
+            open={openClientId === client.id}
+            hinted={swipeHint.showHint && client.id === filtered[0]?.id}
+            onOpen={() => setOpenClientId(client.id)}
+            onClose={() => setOpenClientId(null)}
+            onHintDismiss={swipeHint.dismissHint}
+            onEdit={() => onEdit?.(client)}
+            onDelete={() => onDelete?.(client)}
+          />;
         })}
         {!filtered.length && (
           <div className="empty">
@@ -1077,5 +1090,68 @@ export function ClientsPage({
         )}
       </div>
     </section>
+  );
+}
+
+function ClientSwipeRow({
+  client,
+  shootCount,
+  revenue,
+  open,
+  hinted,
+  onOpen,
+  onClose,
+  onHintDismiss,
+  onEdit,
+  onDelete,
+}: {
+  client: Client;
+  shootCount: number;
+  revenue: number;
+  open: boolean;
+  hinted: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onHintDismiss: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const swipe = useSwipeGesture({
+    open,
+    hinted,
+    onOpen,
+    onClose,
+    onHintDismiss,
+  });
+
+  return (
+    <div className="client-swipe-shell">
+      <SwipeActions
+        open={open}
+        onEdit={() => {
+          onClose();
+          onEdit();
+        }}
+        onDelete={() => {
+          onClose();
+          onDelete();
+        }}
+      />
+      <article
+        className={`client-row${hinted ? " swipe-hint" : ""}`}
+        style={{ transform: `translateX(${swipe.translateX}px)` }}
+        onPointerDown={swipe.onPointerDown}
+        onPointerMove={swipe.onPointerMove}
+        onPointerUp={swipe.onPointerUp}
+        onPointerCancel={swipe.onPointerCancel}
+      >
+        <span className="avatar">{initials(client.name)}</span>
+        <div>
+          <h3>{client.name}</h3>
+          <p>{client.phone || "нет телефона"} · {shootCount} съёмок</p>
+        </div>
+        <strong>{money(revenue)}</strong>
+      </article>
+    </div>
   );
 }

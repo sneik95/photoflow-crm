@@ -131,6 +131,7 @@ select:focus-visible {
   color: var(--pf-muted);
   font-size: 10px;
   letter-spacing: .2em;
+  white-space: nowrap;
 }
 
 .page-kicker b {
@@ -732,6 +733,22 @@ fieldset legend { color: var(--pf-muted); }
   color: var(--pf-muted);
 }
 .filter-row button.active { border-color: rgba(82, 103, 255, .28); background: var(--pf-accent-soft); color: var(--pf-accent); }
+.client-swipe-shell {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--pf-border);
+}
+.client-swipe-shell:last-child { border-bottom: 0; }
+.client-list .client-row {
+  position: relative;
+  z-index: 1;
+  border-bottom: 0;
+  background: #fff;
+  touch-action: pan-y;
+  will-change: transform;
+  transition: transform .34s cubic-bezier(.22, 1, .36, 1), background-color .18s ease;
+}
+.client-list .client-row.swipe-hint { transition-timing-function: cubic-bezier(.22, 1.35, .36, 1); }
 .client-list article { border-color: var(--pf-border); background: #fff; }
 .client-list article:hover { background: var(--pf-card-soft); }
 .client-list article p { color: var(--pf-muted); }

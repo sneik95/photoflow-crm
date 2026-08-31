@@ -2,6 +2,7 @@
 
 import {
   CSSProperties,
+  PointerEvent,
   ReactNode,
   useCallback,
   useEffect,
@@ -77,6 +78,99 @@ export function useOneTimeSwipeHint(key: string, enabled: boolean) {
   }, [clearTimers, enabled, key]);
 
   return { showHint, dismissHint };
+}
+
+export function useSwipeGesture({
+  open,
+  hinted,
+  onOpen,
+  onClose,
+  onHintDismiss,
+  ignoreSelector,
+}: {
+  open: boolean;
+  hinted: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onHintDismiss: () => void;
+  ignoreSelector?: string;
+}) {
+  const [dragX, setDragX] = useState<number | null>(null);
+  const gesture = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    horizontal: boolean | null;
+  } | null>(null);
+  const didSwipe = useRef(false);
+  const restingX = open ? -SWIPE_ACTIONS_WIDTH : hinted ? -42 : 0;
+
+  function onPointerDown(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (
+      ignoreSelector &&
+      (event.target as HTMLElement).closest(ignoreSelector)
+    ) return;
+    onHintDismiss();
+    gesture.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      horizontal: null,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event: PointerEvent<HTMLElement>) {
+    const current = gesture.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - current.startX;
+    const deltaY = event.clientY - current.startY;
+    if (
+      current.horizontal === null &&
+      Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8
+    ) {
+      current.horizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    }
+    if (!current.horizontal) return;
+    didSwipe.current = true;
+    setDragX(
+      Math.min(
+        0,
+        Math.max(
+          -SWIPE_ACTIONS_WIDTH - 18,
+          (open ? -SWIPE_ACTIONS_WIDTH : 0) + deltaX,
+        ),
+      ),
+    );
+  }
+
+  function finishPointer(event: PointerEvent<HTMLElement>) {
+    const current = gesture.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    if (current.horizontal) {
+      const deltaX = event.clientX - current.startX;
+      if (
+        deltaX < -48 ||
+        (dragX !== null && dragX < -SWIPE_ACTIONS_WIDTH / 2)
+      ) onOpen();
+      else onClose();
+    }
+    gesture.current = null;
+    setDragX(null);
+    window.requestAnimationFrame(() => {
+      didSwipe.current = false;
+    });
+  }
+
+  return {
+    didSwipe,
+    translateX: dragX === null ? restingX : dragX,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp: finishPointer,
+    onPointerCancel: finishPointer,
+  };
 }
 
 export function SwipeActions({

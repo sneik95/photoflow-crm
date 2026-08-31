@@ -3,9 +3,7 @@
 import {
   Dispatch,
   FormEvent,
-  PointerEvent,
   SetStateAction,
-  useRef,
   useState,
 } from "react";
 import type { Client, Shoot, ShootType } from "./crm-data";
@@ -31,9 +29,9 @@ import {
   Icon,
   PageHeader,
   SwipeActions,
-  SWIPE_ACTIONS_WIDTH,
   ToggleRow,
   useOneTimeSwipeHint,
+  useSwipeGesture,
 } from "./crm-ui";
 
 export function FinancePage({ shoots }: { shoots: Shoot[] }) {
@@ -250,77 +248,33 @@ function SwipeableTypeRow({
   onSaveEdit: () => void;
   onCancelEdit: () => void;
 }) {
-  const [dragX, setDragX] = useState<number | null>(null);
-  const gesture = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    horizontal: boolean | null;
-  } | null>(null);
-  const didSwipe = useRef(false);
-  const actionsWidth = SWIPE_ACTIONS_WIDTH;
   const editDraft = editing?.index === index ? editing.draft : null;
-  const restingX = isOpen ? -actionsWidth : isHinted ? -42 : 0;
-  const translateX = dragX === null ? restingX : dragX;
-
-  function onPointerDown(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    if ((event.target as HTMLElement).closest(".type-row-controls")) return;
-    onHintDismiss();
-    gesture.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      horizontal: null,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function onPointerMove(event: PointerEvent<HTMLElement>) {
-    const current = gesture.current;
-    if (!current || current.pointerId !== event.pointerId) return;
-    const deltaX = event.clientX - current.startX;
-    const deltaY = event.clientY - current.startY;
-    if (current.horizontal === null && Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8) {
-      current.horizontal = Math.abs(deltaX) > Math.abs(deltaY);
-    }
-    if (!current.horizontal) return;
-    didSwipe.current = true;
-    setDragX(Math.min(0, Math.max(-actionsWidth - 18, (isOpen ? -actionsWidth : 0) + deltaX)));
-  }
-
-  function finishPointer(event: PointerEvent<HTMLElement>) {
-    const current = gesture.current;
-    if (!current || current.pointerId !== event.pointerId) return;
-    if (current.horizontal) {
-      const deltaX = event.clientX - current.startX;
-      if (deltaX < -48 || dragX !== null && dragX < -actionsWidth / 2) onOpen();
-      else onClose();
-    }
-    gesture.current = null;
-    setDragX(null);
-    window.requestAnimationFrame(() => {
-      didSwipe.current = false;
-    });
-  }
+  const swipe = useSwipeGesture({
+    open: isOpen,
+    hinted: isHinted,
+    onOpen,
+    onClose,
+    onHintDismiss,
+    ignoreSelector: ".type-row-controls",
+  });
 
   return (
     <div className="type-swipe-shell">
       <SwipeActions open={isOpen} onEdit={onEdit} onDelete={onDelete} />
       <article
         className={`type-row${editDraft ? " expanded" : ""}${isHinted ? " swipe-hint" : ""}`}
-        style={{ transform: `translateX(${translateX}px)` }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={finishPointer}
-        onPointerCancel={finishPointer}
+        style={{ transform: `translateX(${swipe.translateX}px)` }}
+        onPointerDown={swipe.onPointerDown}
+        onPointerMove={swipe.onPointerMove}
+        onPointerUp={swipe.onPointerUp}
+        onPointerCancel={swipe.onPointerCancel}
       >
         <button
           type="button"
           className="type-row-summary"
           aria-label={`Изменить тип ${type.name}`}
           onClick={(event) => {
-            if (didSwipe.current) {
+            if (swipe.didSwipe.current) {
               event.preventDefault();
               return;
             }
