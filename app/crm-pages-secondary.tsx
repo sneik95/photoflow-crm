@@ -12,13 +12,14 @@ import {
   dateRu,
   displayColor,
   money,
-  profitPerHour,
-  shootDurationHours,
 } from "./crm-data";
 import {
   availableFinanceYears,
+  financeProfitPerHour,
+  financeShootHours,
+  financeSummary,
+  safeFinanceNumber,
   shootsInCurrentMonth,
-  shootsInFinanceYear,
 } from "./crm-finance";
 import { downloadCrmExcel } from "./excel-export";
 import {
@@ -44,43 +45,28 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
   const currentYear = now.getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const availableYears = availableFinanceYears(shoots, currentYear);
-  const yearShoots = shootsInFinanceYear(shoots, selectedYear);
+  const {
+    yearShoots,
+    total,
+    received,
+    expected,
+    totalCosts,
+    totalHours,
+    netProfit,
+    averageProfitHour,
+    averageCheck,
+    byType,
+  } = financeSummary(shoots, selectedYear);
   const isCurrentYear = selectedYear === currentYear;
   const currentMonth = new Intl.DateTimeFormat("ru-RU", {
     month: "short",
     year: "numeric",
   }).format(now);
-  const total = yearShoots.reduce((sum, shoot) => sum + shoot.price, 0);
   const currentMonthTotal = shootsInCurrentMonth(shoots, now).reduce(
-    (sum, shoot) => sum + shoot.price,
+    (sum, shoot) => sum + safeFinanceNumber(shoot.price),
     0,
   );
-  const received = yearShoots.reduce((sum, shoot) => sum + shoot.paidAmount, 0);
-  const expected = total - received;
-  const totalCosts = yearShoots.reduce(
-    (sum, shoot) => sum + shoot.travelCost + shoot.otherCosts,
-    0,
-  );
-  const netProfit = total - totalCosts;
-  const totalHours = yearShoots.reduce(
-    (sum, shoot) =>
-      sum +
-      shootDurationHours(shoot) +
-      shoot.editingHours +
-      shoot.travelMinutes / 60,
-    0,
-  );
-  const averageProfitHour = totalHours ? Math.round(netProfit / totalHours) : 0;
   const annualGoal = 2_500_000;
-  const byType = Object.entries(
-    yearShoots.reduce<Record<string, number>>(
-      (acc, shoot) => ({
-        ...acc,
-        [shoot.type]: (acc[shoot.type] || 0) + shoot.price,
-      }),
-      {},
-    ),
-  ).sort((a, b) => b[1] - a[1]);
 
   return (
     <section className="page">
@@ -126,6 +112,10 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
             <p>{Math.round(totalHours)} ч. вместе с обработкой</p>
           </article>
         )}
+        <article>
+          <span>Средний чек</span><strong>{money(averageCheck)}</strong>
+          <p>за проект в {selectedYear} году</p>
+        </article>
       </div>
 
       <div className="panel time-economics">
@@ -144,20 +134,20 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
         <div className="profitability-list">
           {yearShoots
             .slice()
-            .sort((a, b) => profitPerHour(b) - profitPerHour(a))
+            .sort((a, b) => financeProfitPerHour(b) - financeProfitPerHour(a))
             .map((shoot, index) => {
-              const hours =
-                shootDurationHours(shoot) +
-                shoot.editingHours +
-                shoot.travelMinutes / 60;
+              const hours = financeShootHours(shoot);
+              const costs =
+                safeFinanceNumber(shoot.travelCost) +
+                safeFinanceNumber(shoot.otherCosts);
               return (
                 <article key={shoot.id}>
                   <span className="profit-rank">{index + 1}</span>
                   <div>
                     <strong>{shoot.type} · {shoot.clientName}</strong>
-                    <small>{hours.toFixed(1)} ч. · расходы {money(shoot.travelCost + shoot.otherCosts)}</small>
+                    <small>{hours.toFixed(1)} ч. · расходы {money(costs)}</small>
                   </div>
-                  <b>{money(profitPerHour(shoot))}/ч</b>
+                  <b>{money(financeProfitPerHour(shoot))}/ч</b>
                 </article>
               );
             })}
@@ -210,7 +200,7 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
                 <h3>{shoot.clientName}</h3>
                 <p>{shoot.type} · {dateRu(shoot.startAt)}</p>
               </div>
-              <strong>{money(shoot.price)}</strong>
+              <strong>{money(safeFinanceNumber(shoot.price))}</strong>
             </article>
           ))}
         </div>
@@ -629,10 +619,6 @@ export function SettingsPage({
           </div>
         </div>
         <div className="settings-toggle-list">
-          <ToggleRow
-            title="Показывать средний чек"
-            subtitle="Карточка среднего чека в финансах"
-          />
           <div className="delivery-reminder-setting">
             <ToggleRow
               title="Напоминать о сроке сдачи"
