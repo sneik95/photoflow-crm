@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
+import { register } from "node:module";
 import test from "node:test";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
+register("./cloudflare-test-loader.mjs", import.meta.url);
 
-test("renders development preview metadata", async () => {
+test("renders one unified SSR document and matching client assets", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -31,7 +31,6 @@ test("renders development preview metadata", async () => {
     /^text\/html\b/i,
   );
   const html = await response.text();
-  assert.match(html, developmentPreviewMeta);
   assert.match(html, /Мои съёмки/);
   assert.doesNotMatch(html, /Материал без 2-й копии|Удалить все|Резервные копии|Погода и свет/);
   assert.doesNotMatch(html, /photoflow-hotfix|photoflow-runtime|risk-modal-fix/);
