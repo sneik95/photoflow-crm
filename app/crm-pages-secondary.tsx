@@ -1,6 +1,14 @@
 "use client";
 
-import { Dispatch, FormEvent, SetStateAction, useState } from "react";
+import {
+  Dispatch,
+  FormEvent,
+  PointerEvent,
+  SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { Client, Shoot, ShootType } from "./crm-data";
 import {
   COLORS,
@@ -11,6 +19,14 @@ import {
   shootDurationHours,
 } from "./crm-data";
 import { downloadCrmExcel } from "./excel-export";
+import {
+  deliveryReminderSetting,
+  normalizeShootType,
+  positiveWholeNumber,
+  reminderDaysLabel,
+  removeShootType,
+  storedDeliveryReminderDays,
+} from "./crm-settings";
 import { Field, Icon, PageHeader, ToggleRow } from "./crm-ui";
 
 export function FinancePage({ shoots }: { shoots: Shoot[] }) {
@@ -196,6 +212,183 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
   );
 }
 
+type TypeEditState = { index: number; draft: ShootType } | null;
+
+function SwipeableTypeRow({
+  type,
+  index,
+  isOpen,
+  isHinted,
+  editing,
+  onOpen,
+  onClose,
+  onEdit,
+  onDelete,
+  onDraftChange,
+  onSaveEdit,
+  onCancelEdit,
+}: {
+  type: ShootType;
+  index: number;
+  isOpen: boolean;
+  isHinted: boolean;
+  editing: TypeEditState;
+  onOpen: () => void;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onDraftChange: (patch: Partial<ShootType>) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+}) {
+  const [dragX, setDragX] = useState<number | null>(null);
+  const gesture = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    horizontal: boolean | null;
+  } | null>(null);
+  const didSwipe = useRef(false);
+  const actionsWidth = 178;
+  const editDraft = editing?.index === index ? editing.draft : null;
+  const restingX = isOpen ? -actionsWidth : isHinted ? -42 : 0;
+  const translateX = dragX === null ? restingX : dragX;
+
+  function onPointerDown(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if ((event.target as HTMLElement).closest(".type-row-controls")) return;
+    gesture.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      horizontal: null,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event: PointerEvent<HTMLElement>) {
+    const current = gesture.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - current.startX;
+    const deltaY = event.clientY - current.startY;
+    if (current.horizontal === null && Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8) {
+      current.horizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    }
+    if (!current.horizontal) return;
+    didSwipe.current = true;
+    setDragX(Math.min(0, Math.max(-actionsWidth - 18, (isOpen ? -actionsWidth : 0) + deltaX)));
+  }
+
+  function finishPointer(event: PointerEvent<HTMLElement>) {
+    const current = gesture.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    if (current.horizontal) {
+      const deltaX = event.clientX - current.startX;
+      if (deltaX < -48 || dragX !== null && dragX < -actionsWidth / 2) onOpen();
+      else onClose();
+    }
+    gesture.current = null;
+    setDragX(null);
+    window.requestAnimationFrame(() => {
+      didSwipe.current = false;
+    });
+  }
+
+  return (
+    <div className="type-swipe-shell">
+      <div className="type-swipe-actions" aria-hidden={!isOpen}>
+        <button type="button" className="type-swipe-edit" onClick={onEdit} tabIndex={isOpen ? 0 : -1}>
+          Изменить
+        </button>
+        <button type="button" className="type-swipe-delete" onClick={onDelete} tabIndex={isOpen ? 0 : -1}>
+          Удалить
+        </button>
+      </div>
+      <article
+        className={`type-row${editDraft ? " expanded" : ""}${isHinted ? " swipe-hint" : ""}`}
+        style={{ transform: `translateX(${translateX}px)` }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={finishPointer}
+        onPointerCancel={finishPointer}
+      >
+        <button
+          type="button"
+          className="type-row-summary"
+          aria-label={`Изменить тип ${type.name}`}
+          onClick={(event) => {
+            if (didSwipe.current) {
+              event.preventDefault();
+              return;
+            }
+            onEdit();
+          }}
+        >
+          <i className="type-swatch" style={{ background: displayColor(type.color), color: displayColor(type.color) }} />
+          <span className="type-summary-copy">
+            <strong>{type.name}</strong>
+            <small>Цвет и срок обработки</small>
+          </span>
+          <span className="type-deadline-summary">
+            <b>{type.deliveryDays}</b>
+            <small>дней</small>
+          </span>
+        </button>
+        {editDraft && (
+          <div className="type-row-controls">
+            <label className="settings-control-block">
+              <span>Название типа</span>
+              <input
+                className="type-name-input"
+                value={editDraft.name}
+                onChange={(event) => onDraftChange({ name: event.target.value })}
+                aria-label="Название типа съёмки"
+              />
+            </label>
+            <div className="settings-control-block">
+              <span>Цвет в календаре</span>
+              <div className="color-picker" role="group" aria-label={`Цвет типа ${type.name}`}>
+                {COLORS.map((color) => (
+                  <button
+                    type="button"
+                    aria-label={`Выбрать цвет ${color}`}
+                    aria-pressed={editDraft.color === color}
+                    key={color}
+                    onClick={() => onDraftChange({ color })}
+                    className={editDraft.color === color ? "selected" : ""}
+                    style={{ background: displayColor(color) }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="deadline-control">
+              <span>
+                <strong>Срок обработки</strong>
+                <small>Дедлайн после даты съёмки</small>
+              </span>
+              <label className="deadline-input">
+                <input
+                  aria-label={`Срок обработки для ${type.name}`}
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  value={editDraft.deliveryDays}
+                  onChange={(event) => onDraftChange({ deliveryDays: Number(event.target.value) })}
+                />
+                <span>дней</span>
+              </label>
+            </div>
+            <div className="type-edit-actions">
+              <button type="button" className="button muted" onClick={onCancelEdit}>Отменить</button>
+              <button type="button" className="button primary" onClick={onSaveEdit}>Сохранить</button>
+            </div>
+          </div>
+        )}
+      </article>
+    </div>
+  );
+}
+
 export function SettingsPage({
   types,
   setTypes,
@@ -203,6 +396,7 @@ export function SettingsPage({
   clients,
   notify,
   initialReminders,
+  initialDeliveryReminderDays = 1,
   onSave,
 }: {
   types: ShootType[];
@@ -211,11 +405,70 @@ export function SettingsPage({
   clients: Client[];
   notify: (message: string) => void;
   initialReminders?: number[];
-  onSave?: (types: ShootType[], reminders: number[]) => void;
+  initialDeliveryReminderDays?: number;
+  onSave?: (types: ShootType[], reminders: number[], deliveryReminderDays: number) => Promise<boolean> | boolean | void;
 }) {
   const [reminders, setReminders] = useState(initialReminders || [5, 1, 0]);
+  const [deliveryReminder, setDeliveryReminder] = useState(() =>
+    deliveryReminderSetting(initialDeliveryReminderDays),
+  );
   const [googleHelp, setGoogleHelp] = useState(false);
-  const [openType, setOpenType] = useState<number | null>(0);
+  const [openSwipe, setOpenSwipe] = useState<number | null>(null);
+  const [hintedType, setHintedType] = useState<number | null>(null);
+  const [editing, setEditing] = useState<TypeEditState>(null);
+
+  useEffect(() => {
+    if (!types.length || typeof window === "undefined") return;
+    const hintKey = "photoflow:settings-types-swipe-hint:v1";
+    if (window.sessionStorage.getItem(hintKey)) return;
+    window.sessionStorage.setItem(hintKey, "1");
+    let timeout: number | undefined;
+    const frame = window.requestAnimationFrame(() => {
+      setHintedType(0);
+      timeout = window.setTimeout(() => setHintedType(null), 560);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [types.length]);
+
+  const deliveryReminderDays = storedDeliveryReminderDays(deliveryReminder);
+
+  async function persist(nextTypes = types, nextDeliveryDays = deliveryReminderDays) {
+    const result = await onSave?.(nextTypes, reminders, nextDeliveryDays);
+    return result !== false;
+  }
+
+  function beginEdit(index: number) {
+    setOpenSwipe(null);
+    setHintedType(null);
+    setEditing({ index, draft: { ...types[index] } });
+  }
+
+  async function saveType() {
+    if (!editing) return;
+    const next = normalizeShootType(editing.draft);
+    if (!next.name) {
+      notify("Введите название типа съёмки");
+      return;
+    }
+    const nextTypes = types.map((type, index) => index === editing.index ? next : type);
+    setTypes(nextTypes);
+    setEditing(null);
+    if (await persist(nextTypes)) notify("Тип съёмки сохранён");
+  }
+
+  async function deleteType(index: number) {
+    setOpenSwipe(null);
+    if (!window.confirm(`Удалить тип «${types[index]?.name || ""}»? Существующие съёмки сохранят свои данные.`)) {
+      return;
+    }
+    const nextTypes = removeShootType(types, index);
+    setTypes(nextTypes);
+    if (editing?.index === index) setEditing(null);
+    if (await persist(nextTypes)) notify("Тип съёмки удалён");
+  }
 
   function exportCalendar() {
     const pad = (value: number) => String(value).padStart(2, "0");
@@ -262,96 +515,42 @@ export function SettingsPage({
           </div>
         </div>
         <div className="type-list">
-          {types.map((type, index) => {
-            const expanded = openType === index;
-            return (
-              <article
-                className={`type-row${expanded ? " expanded" : ""}`}
-                key={`${type.name}-${index}`}
-              >
-                <button
-                  type="button"
-                  className="type-row-summary"
-                  aria-expanded={expanded}
-                  onClick={() => setOpenType(expanded ? null : index)}
-                >
-                  <i className="type-swatch" style={{ background: displayColor(type.color), color: displayColor(type.color) }} />
-                  <span className="type-summary-copy">
-                    <strong>{type.name}</strong>
-                    <small>Цвет и срок обработки</small>
-                  </span>
-                  <span className="type-deadline-summary">
-                    <b>{type.deliveryDays}</b>
-                    <small>дней</small>
-                    <i className="settings-chevron" />
-                  </span>
-                </button>
-                {expanded && (
-                  <div className="type-row-controls">
-                    <div className="settings-control-block">
-                      <span>Цвет в календаре</span>
-                      <div className="color-picker" role="group" aria-label={`Цвет типа ${type.name}`}>
-                        {COLORS.map((color) => (
-                          <button
-                            type="button"
-                            aria-label={`Выбрать цвет ${color}`}
-                            aria-pressed={type.color === color}
-                            key={color}
-                            onClick={() =>
-                              setTypes((current) =>
-                                current.map((item, itemIndex) =>
-                                  itemIndex === index ? { ...item, color } : item,
-                                ),
-                              )
-                            }
-                            className={type.color === color ? "selected" : ""}
-                            style={{ background: displayColor(color) }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <div className="deadline-control">
-                      <span>
-                        <strong>Срок обработки</strong>
-                        <small>Дедлайн после даты съёмки</small>
-                      </span>
-                      <label className="deadline-input">
-                        <input
-                          aria-label={`Срок обработки для ${type.name}`}
-                          type="number"
-                          min="1"
-                          value={type.deliveryDays}
-                          onChange={(event) =>
-                            setTypes((current) =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index
-                                  ? { ...item, deliveryDays: Number(event.target.value) }
-                                  : item,
-                              ),
-                            )
-                          }
-                        />
-                        <span>дней</span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </article>
-            );
-          })}
+          {types.map((type, index) => (
+            <SwipeableTypeRow
+              key={`${type.name}-${index}`}
+              type={type}
+              index={index}
+              isOpen={openSwipe === index}
+              isHinted={hintedType === index}
+              editing={editing}
+              onOpen={() => setOpenSwipe(index)}
+              onClose={() => setOpenSwipe(null)}
+              onEdit={() => beginEdit(index)}
+              onDelete={() => void deleteType(index)}
+              onDraftChange={(patch) => setEditing((current) =>
+                current?.index === index
+                  ? { ...current, draft: { ...current.draft, ...patch } }
+                  : current,
+              )}
+              onSaveEdit={() => void saveType()}
+              onCancelEdit={() => setEditing(null)}
+            />
+          ))}
         </div>
         <button
           className="button secondary full add-type-button"
           onClick={() => {
-            setOpenType(types.length);
-            setTypes((current) => [
-              ...current,
+            const index = types.length;
+            const nextTypes = [
+              ...types,
               {
-                name: `Новый тип ${current.length + 1}`,
-                color: COLORS[current.length % COLORS.length],
+                name: `Новый тип ${types.length + 1}`,
+                color: COLORS[types.length % COLORS.length],
                 deliveryDays: 14,
               },
-            ]);
+            ];
+            setTypes(nextTypes);
+            setEditing({ index, draft: nextTypes[index] });
           }}
         >
           <Icon name="plus" />
@@ -460,11 +659,41 @@ export function SettingsPage({
             title="Показывать средний чек"
             subtitle="Карточка среднего чека в финансах"
           />
-          <ToggleRow
-            title="Напоминать о сроке сдачи"
-            subtitle="Письмо за 1 день до дедлайна"
-            defaultOn
-          />
+          <div className="delivery-reminder-setting">
+            <ToggleRow
+              title="Напоминать о сроке сдачи"
+              subtitle={
+                deliveryReminder.enabled
+                  ? `Напомнить за ${reminderDaysLabel(deliveryReminder.days)} до срока сдачи`
+                  : "Напоминания отключены"
+              }
+              checked={deliveryReminder.enabled}
+              onChange={(enabled) =>
+                setDeliveryReminder((current) => ({ ...current, enabled }))
+              }
+            />
+            <label className="delivery-reminder-days">
+              <span>Напомнить за</span>
+              <input
+                className="delivery-reminder-input"
+                aria-label="За сколько дней напомнить о сроке сдачи"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                step="1"
+                disabled={!deliveryReminder.enabled}
+                value={deliveryReminder.days}
+                onChange={(event) => {
+                  const days = positiveWholeNumber(event.target.value, 0);
+                  if (days > 0) {
+                    setDeliveryReminder((current) => ({ ...current, days }));
+                  }
+                }}
+              />
+              <span>{reminderDaysLabel(deliveryReminder.days).replace(/^\d+\s/, "")}</span>
+              <span>до срока сдачи</span>
+            </label>
+          </div>
         </div>
       </div>
       <div className="panel settings-panel">
@@ -494,7 +723,9 @@ export function SettingsPage({
       </div>
       <button
         className="button primary full settings-save"
-        onClick={() => onSave?.(types, reminders)}
+        onClick={() => {
+          void persist().then((saved) => saved && notify("Настройки сохранены"));
+        }}
       >
         Сохранить настройки
       </button>

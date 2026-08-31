@@ -80,29 +80,33 @@ export function ToggleRow({
   title,
   subtitle,
   defaultOn = false,
+  checked,
   onChange,
 }: {
   title: string;
   subtitle: string;
   defaultOn?: boolean;
+  checked?: boolean;
   onChange?: (value: boolean) => void;
 }) {
   const [active, setActive] = useState(defaultOn);
+  const isActive = checked ?? active;
   return (
     <button
       type="button"
       className="toggle-row"
-      aria-pressed={active}
+      aria-pressed={isActive}
       onClick={() => {
-        setActive(!active);
-        onChange?.(!active);
+        const next = !isActive;
+        if (checked === undefined) setActive(next);
+        onChange?.(next);
       }}
     >
       <span>
         <strong>{title}</strong>
         <small>{subtitle}</small>
       </span>
-      <i className={active ? "on" : ""}>
+      <i className={isActive ? "on" : ""}>
         <b />
       </i>
     </button>

@@ -783,6 +783,82 @@ fieldset legend { color: var(--pf-muted); }
 }
 .type-row.expanded { border-color: rgba(82,103,255,.28); background: #fff; box-shadow: 0 0 0 3px rgba(82,103,255,.06); }
 .type-row-controls { border-color: var(--pf-border); background: #fbfaf7; }
+.settings-types-panel { overflow: hidden; }
+.type-list { overflow: hidden; }
+.type-swipe-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+}
+.type-swipe-actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 178px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 18px;
+  background: #eef2ff;
+}
+.type-swipe-actions button {
+  min-width: 0;
+  min-height: 56px;
+  padding: 10px 6px;
+  border: 0;
+  border-radius: 13px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.type-swipe-edit { color: #3e55d8; background: #dfe5ff; }
+.type-swipe-delete { color: #b94e3b; background: #ffe6df; }
+.type-row {
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y;
+  will-change: transform;
+  transition: transform .24s cubic-bezier(.22, 1, .36, 1), border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+.type-row.swipe-hint { transition-timing-function: cubic-bezier(.22, 1.35, .36, 1); }
+.type-name-input,
+.delivery-reminder-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--pf-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--pf-text);
+  font-size: 16px;
+}
+.type-edit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+.type-edit-actions .button { min-height: 44px; }
+.delivery-reminder-setting { border-top: 1px solid var(--pf-border); }
+.delivery-reminder-setting .toggle-row { border-bottom: 0; }
+.delivery-reminder-days {
+  display: grid;
+  grid-template-columns: auto 72px auto;
+  align-items: center;
+  justify-content: start;
+  gap: 8px;
+  padding: 0 1px 16px;
+  color: var(--pf-muted);
+  font-size: 14px;
+}
+.delivery-reminder-days > span:last-child { grid-column: 1 / -1; }
+.delivery-reminder-input {
+  min-height: 42px;
+  padding: 8px;
+  text-align: center;
+}
+.delivery-reminder-input:disabled { color: var(--pf-muted); background: #f0f1f4; opacity: 1; }
 .type-swatch { border-color: #fff; box-shadow: 0 0 0 1px var(--pf-border); }
 .type-deadline-summary b { color: var(--pf-accent); }
 .color-picker button.selected { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--pf-text); }

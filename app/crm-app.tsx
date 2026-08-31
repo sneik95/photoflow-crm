@@ -33,12 +33,18 @@ const INITIAL_PROFILE: ProfileData = {
   goal: "2500000",
 };
 
+const INITIAL_PREFERENCES = {
+  showAverage: false,
+  deliveryReminderDays: 1,
+};
+
 const INITIAL_SNAPSHOT: CrmSnapshot = {
   clients: INITIAL_CLIENTS,
   shoots: INITIAL_SHOOTS,
   types: DEFAULT_TYPES,
   reminders: [5, 1, 0],
   profile: INITIAL_PROFILE,
+  preferences: INITIAL_PREFERENCES,
 };
 
 function normalizeColors(snapshot: CrmSnapshot): CrmSnapshot {
@@ -61,6 +67,7 @@ export default function CrmApp() {
   const [shoots, setShoots] = useState(INITIAL_SHOOTS);
   const [types, setTypes] = useState(DEFAULT_TYPES);
   const [reminders, setReminders] = useState([5, 1, 0]);
+  const [preferences, setPreferences] = useState(INITIAL_PREFERENCES);
   const [profile, setProfile] = useState<ProfileData>(INITIAL_PROFILE);
   const [shootModal, setShootModal] = useState(false);
   const [shootModalDate, setShootModalDate] = useState<string | undefined>();
@@ -86,6 +93,7 @@ export default function CrmApp() {
       setTypes(snapshot.types);
       setReminders(snapshot.reminders);
       setProfile(snapshot.profile);
+      setPreferences({ ...INITIAL_PREFERENCES, ...snapshot.preferences });
       setQueued(state.queued);
       setSyncing(state.syncing);
       setOnline(state.online);
@@ -227,19 +235,26 @@ export default function CrmApp() {
         {tab === "finance" && <FinancePage shoots={shoots} />}
         {tab === "settings" && (
           <SettingsPage
+            key={`${reminders.join(",")}-${preferences.deliveryReminderDays}`}
             types={types}
             setTypes={setTypes}
             shoots={shoots}
             clients={clients}
             notify={notify}
             initialReminders={reminders}
-            onSave={(nextTypes, nextReminders) => {
+            initialDeliveryReminderDays={preferences.deliveryReminderDays}
+            onSave={async (nextTypes, nextReminders, deliveryReminderDays) => {
               setReminders(nextReminders);
-              void serverAction("savePreferences", {
+              setTypes(nextTypes);
+              setPreferences((current) => ({ ...current, deliveryReminderDays }));
+              const saved = await serverAction("savePreferences", {
                 profile,
                 types: nextTypes,
                 reminders: nextReminders,
-              }).then((saved) => saved && notify("Настройки сохранены"));
+                showAverage: preferences.showAverage,
+                deliveryReminderDays,
+              });
+              return saved;
             }}
           />
         )}
@@ -254,6 +269,8 @@ export default function CrmApp() {
                 profile: nextProfile,
                 types,
                 reminders,
+                showAverage: preferences.showAverage,
+                deliveryReminderDays: preferences.deliveryReminderDays,
               });
             }}
           />

@@ -19,7 +19,7 @@ function ownerFrom(request: Request) {
 function safeTypes(value: string) {
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_TYPES;
+    return Array.isArray(parsed) ? parsed : DEFAULT_TYPES;
   } catch {
     return DEFAULT_TYPES;
   }
@@ -431,19 +431,18 @@ export async function POST(request: Request) {
         .where(and(eq(clients.owner, owner), eq(clients.id, Number(payload.id))));
     } else if (payload.action === "savePreferences") {
       const profile = (data.profile || {}) as Record<string, unknown>;
+      const reminderDays = Number(data.deliveryReminderDays);
       const update = {
         firstName: String(profile.firstName || ""),
         lastName: String(profile.lastName || ""),
         phone: String(profile.phone || ""),
         city: String(profile.city || ""),
         annualGoal: Math.max(0, Number(profile.goal) || 0),
-        typesJson: JSON.stringify(data.types || DEFAULT_TYPES),
+        typesJson: JSON.stringify(Array.isArray(data.types) ? data.types : DEFAULT_TYPES),
         remindersJson: JSON.stringify(data.reminders || [5, 1, 0]),
         showAverage: Boolean(data.showAverage),
-        deliveryReminderDays: Math.max(
-          0,
-          Number(data.deliveryReminderDays) || 1,
-        ),
+        deliveryReminderDays:
+          Number.isInteger(reminderDays) && reminderDays >= 0 ? reminderDays : 1,
         updatedAt: new Date().toISOString(),
       };
       await db

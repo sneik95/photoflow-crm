@@ -14,6 +14,7 @@
     "test:data": "node --test tests/crm-data-layer.test.ts",
     "test:dashboard": "node --test tests/crm-dashboard.test.ts",
     "test:form": "node --test tests/crm-form.test.ts",
+    "test:settings": "node --test tests/crm-settings.test.ts",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
   },
