@@ -220,14 +220,46 @@ export async function POST(request: Request) {
       if (!name) {
         return Response.json({ error: "Укажите имя клиента" }, { status: 400 });
       }
-      await db.insert(clients).values({
+      const [createdClient] = await db.insert(clients).values({
         owner,
         name,
         phone: String(data.phone || ""),
         email: String(data.email || ""),
         kind: data.kind === "company" ? "company" : "person",
         notes: String(data.notes || ""),
-      });
+      }).returning({ id: clients.id });
+      if (!createdClient?.id) {
+        return Response.json(
+          { error: "Сервер не подтвердил создание клиента" },
+          { status: 500 },
+        );
+      }
+      mutation = { action: "createClient", clientId: createdClient.id };
+    } else if (payload.action === "updateClient" && payload.id) {
+      const clientId = Number(payload.id);
+      const name = String(data.name || "").trim();
+      if (clientId <= 0) {
+        return Response.json(
+          { error: "Временный ID нельзя отправлять на сервер" },
+          { status: 400 },
+        );
+      }
+      if (!name) {
+        return Response.json({ error: "Укажите имя клиента" }, { status: 400 });
+      }
+      const updated = await db
+        .update(clients)
+        .set({ name })
+        .where(and(eq(clients.owner, owner), eq(clients.id, clientId)))
+        .returning({ id: clients.id });
+      if (!updated.length) {
+        return Response.json({ error: "Клиент не найден" }, { status: 404 });
+      }
+      await db
+        .update(shoots)
+        .set({ clientName: name })
+        .where(and(eq(shoots.owner, owner), eq(shoots.clientId, clientId)));
+      mutation = { action: "updateClient", clientId };
     } else if (payload.action === "createShoot") {
       const clientName = String(data.clientName || "").trim();
       const hasClientPhone = typeof data.clientPhone === "string";
@@ -402,9 +434,32 @@ export async function POST(request: Request) {
       }
       mutation = { action: "deleteShoot", shootId: Number(payload.id) };
     } else if (payload.action === "deleteClient" && payload.id) {
-      await db
+      const clientId = Number(payload.id);
+      if (clientId <= 0) {
+        return Response.json(
+          { error: "Временный ID нельзя отправлять на сервер" },
+          { status: 400 },
+        );
+      }
+      const linkedShoots = await db
+        .select({ id: shoots.id })
+        .from(shoots)
+        .where(and(eq(shoots.owner, owner), eq(shoots.clientId, clientId)))
+        .limit(1);
+      if (linkedShoots.length) {
+        return Response.json(
+          { error: "Клиент связан со съёмками и не может быть удалён" },
+          { status: 409 },
+        );
+      }
+      const deleted = await db
         .delete(clients)
-        .where(and(eq(clients.owner, owner), eq(clients.id, Number(payload.id))));
+        .where(and(eq(clients.owner, owner), eq(clients.id, clientId)))
+        .returning({ id: clients.id });
+      if (!deleted.length) {
+        return Response.json({ error: "Клиент не найден" }, { status: 404 });
+      }
+      mutation = { action: "deleteClient", clientId };
     } else if (payload.action === "savePreferences") {
       const profile = (data.profile || {}) as Record<string, unknown>;
       const reminderDays = Number(data.deliveryReminderDays);

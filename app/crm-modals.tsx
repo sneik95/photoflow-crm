@@ -37,23 +37,26 @@ export function NewClientModal({
   onSave,
 }: {
   onClose: () => void;
-  onSave: (client: Omit<Client, "id">) => void;
+  onSave: (client: Omit<Client, "id">) => Promise<NewShootSaveResult>;
 }) {
   const [kind, setKind] = useState<Client["kind"]>("person");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
 
   return (
     <Modal title="Новый клиент" onClose={onClose}>
       <form
         className="modal-form"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
-          if (name.trim()) {
-            onSave({ name: name.trim(), phone, email, kind, notes });
-          }
+          if (!name.trim() || saving) return;
+          setSaving(true);
+          const result = await onSave({ name: name.trim(), phone, email, kind, notes });
+          setSaving(false);
+          if (result.ok) onClose();
         }}
       >
         <div className="segmented wide-segment">
@@ -104,7 +107,52 @@ export function NewClientModal({
             placeholder="Предпочтения и важные детали…"
           />
         </Field>
-        <button className="button primary full">Добавить клиента</button>
+        <button className="button primary full" disabled={saving}>
+          {saving ? "Сохранение…" : "Добавить клиента"}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+export function EditClientModal({
+  client,
+  onClose,
+  onSave,
+}: {
+  client: Client;
+  onClose: () => void;
+  onSave: (id: number, name: string) => Promise<NewShootSaveResult>;
+}) {
+  const [name, setName] = useState(client.name);
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <Modal title="Редактировать клиента" onClose={onClose}>
+      <form
+        className="modal-form"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const nextName = name.trim();
+          if (!nextName || saving) return;
+          setSaving(true);
+          const result = await onSave(client.id, nextName);
+          setSaving(false);
+          if (result.ok) onClose();
+        }}
+      >
+        <Field label="Имя или название *">
+          <input
+            autoFocus
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </Field>
+        {client.phone && <p className="form-note">Телефон: {client.phone}</p>}
+        <button className="button primary full" disabled={saving}>
+          {saving ? "Сохранение…" : "Сохранить"}
+        </button>
       </form>
     </Modal>
   );

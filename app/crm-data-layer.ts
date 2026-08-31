@@ -22,10 +22,12 @@ export type CrmSnapshot = {
 };
 
 type ShootAction = "createShoot" | "updateShoot" | "deleteShoot";
+type ClientAction = "createClient" | "updateClient" | "deleteClient";
+type MutationAction = ShootAction | ClientAction;
 
 export type QueueItem = {
   key: string;
-  action: ShootAction;
+  action: MutationAction;
   data: Record<string, unknown>;
   id?: number;
   before: CrmSnapshot;
@@ -140,12 +142,37 @@ export function normalizeSnapshot(
   };
 }
 
-function applyShootAction(
+function applyMutation(
   snapshot: CrmSnapshot,
-  action: ShootAction,
+  action: MutationAction,
   data: Record<string, unknown>,
   id?: number,
 ): CrmSnapshot {
+  if (action === "createClient") {
+    const client = data as unknown as Client;
+    if (snapshot.clients.some((item) => item.id === client.id)) return snapshot;
+    return { ...snapshot, clients: [...snapshot.clients, client] };
+  }
+  if (action === "updateClient" && id !== undefined) {
+    const name = typeof data.name === "string" ? data.name : undefined;
+    return {
+      ...snapshot,
+      clients: snapshot.clients.map((client) =>
+        client.id === id ? { ...client, ...(data as Partial<Client>) } : client,
+      ),
+      shoots: name === undefined
+        ? snapshot.shoots
+        : snapshot.shoots.map((shoot) =>
+          shoot.clientId === id ? { ...shoot, clientName: name } : shoot,
+        ),
+    };
+  }
+  if (action === "deleteClient" && id !== undefined) {
+    return {
+      ...snapshot,
+      clients: snapshot.clients.filter((client) => client.id !== id),
+    };
+  }
   if (action === "createShoot") {
     const shoot = data as unknown as Shoot;
     if (snapshot.shoots.some((item) => item.id === shoot.id)) return snapshot;
@@ -191,7 +218,7 @@ function applyShootAction(
 
 function replayQueue(snapshot: CrmSnapshot, queue: QueueItem[]) {
   return queue.reduce(
-    (current, item) => applyShootAction(current, item.action, item.data, item.id),
+    (current, item) => applyMutation(current, item.action, item.data, item.id),
     snapshot,
   );
 }
@@ -301,6 +328,62 @@ export class CrmDataLayer {
     return this.enqueue("createShoot", data);
   }
 
+  async createClient(input: Omit<Client, "id">) {
+    const temporaryClientId = this.takeTemporaryId();
+    return this.enqueue("createClient", {
+      ...input,
+      id: temporaryClientId,
+      __offlineId: temporaryClientId,
+    });
+  }
+
+  async updateClient(id: number, patch: Partial<Client>) {
+    if (id < 0) {
+      const create = this.queue.find(
+        (item) =>
+          item.action === "createClient" && Number(item.data.__offlineId) === id,
+      );
+      if (create) {
+        create.data = { ...create.data, ...patch, id, __offlineId: id };
+        this.snapshot = applyMutation(this.snapshot, "updateClient", patch, id);
+        this.persist();
+        this.emit();
+        return { ok: true, queued: true } satisfies MutationResult;
+      }
+    }
+    return this.enqueue("updateClient", patch as Record<string, unknown>, id);
+  }
+
+  async deleteClient(id: number) {
+    if (this.snapshot.shoots.some((shoot) => shoot.clientId === id)) {
+      return {
+        ok: false,
+        queued: false,
+        error: "Клиент связан со съёмками и не может быть удалён",
+      } satisfies MutationResult;
+    }
+    if (id < 0) {
+      const hasPendingCreate = this.queue.some(
+        (item) =>
+          item.action === "createClient" && Number(item.data.__offlineId) === id,
+      );
+      if (hasPendingCreate) {
+        this.queue = this.queue.filter(
+          (item) =>
+            !(
+              (item.action === "createClient" && Number(item.data.__offlineId) === id) ||
+              item.id === id
+            ),
+        );
+        this.snapshot = applyMutation(this.snapshot, "deleteClient", {}, id);
+        this.persist();
+        this.emit();
+        return { ok: true, queued: false } satisfies MutationResult;
+      }
+    }
+    return this.enqueue("deleteClient", {}, id);
+  }
+
   async updateShoot(id: number, patch: Partial<Shoot>) {
     if (id < 0) {
       const create = this.queue.find(
@@ -309,7 +392,7 @@ export class CrmDataLayer {
       );
       if (create) {
         create.data = { ...create.data, ...patch, id, __offlineId: id };
-        this.snapshot = applyShootAction(this.snapshot, "updateShoot", patch, id);
+        this.snapshot = applyMutation(this.snapshot, "updateShoot", patch, id);
         this.persist();
         this.emit();
         return { ok: true, queued: true } satisfies MutationResult;
@@ -332,7 +415,7 @@ export class CrmDataLayer {
               item.id === id
             ),
         );
-        this.snapshot = applyShootAction(this.snapshot, "deleteShoot", {}, id);
+        this.snapshot = applyMutation(this.snapshot, "deleteShoot", {}, id);
         this.persist();
         this.emit();
         return { ok: true, queued: false } satisfies MutationResult;
@@ -379,7 +462,12 @@ export class CrmDataLayer {
     try {
       while (this.queue.length && this.onlineState) {
         const item = this.queue[0];
-        if (item.id !== undefined && item.id < 0 && item.action !== "createShoot") {
+        if (
+          item.id !== undefined &&
+          item.id < 0 &&
+          item.action !== "createShoot" &&
+          item.action !== "createClient"
+        ) {
           break;
         }
         let response: Response;
@@ -405,11 +493,19 @@ export class CrmDataLayer {
         const serverSnapshot = normalizeSnapshot(body, this.snapshot);
         const partialShoot = isPartialShoot(body.shoot) ? body.shoot : null;
         const createdShootId = Number(body.mutation?.shootId);
-        const validCreate =
+        const createdClientId = Number(body.mutation?.clientId);
+        const validShootCreate =
           item.action !== "createShoot" ||
           (Number.isInteger(createdShootId) && createdShootId > 0) ||
           Boolean(serverSnapshot?.shoots.some((shoot) => shootFingerprint(shoot) === shootFingerprint(item.data as Partial<Shoot>)));
-        if ((!serverSnapshot && !partialShoot) || !validCreate) {
+        const validClientCreate =
+          item.action !== "createClient" ||
+          (Number.isInteger(createdClientId) && createdClientId > 0);
+        if (
+          (!serverSnapshot && !partialShoot) ||
+          !validShootCreate ||
+          !validClientCreate
+        ) {
           permanentError = body.error || "Сервер вернул неполный ответ";
           this.rollback(item);
           continue;
@@ -433,6 +529,12 @@ export class CrmDataLayer {
             serverShoot.id,
             Number(item.data.__offlineClientId),
             Number(body.mutation?.clientId || serverShoot.clientId),
+          );
+        }
+        if (item.action === "createClient") {
+          this.reconcileClientId(
+            Number(item.data.__offlineId),
+            createdClientId,
           );
         }
 
@@ -462,7 +564,7 @@ export class CrmDataLayer {
   }
 
   private async enqueue(
-    action: ShootAction,
+    action: MutationAction,
     data: Record<string, unknown>,
     id?: number,
   ): Promise<MutationResult> {
@@ -475,7 +577,7 @@ export class CrmDataLayer {
       before,
     };
     this.queue.push(item);
-    this.snapshot = applyShootAction(this.snapshot, action, data, id);
+    this.snapshot = applyMutation(this.snapshot, action, data, id);
     this.persist();
     this.emit();
     if (!this.onlineState) return { ok: true, queued: true };
@@ -523,6 +625,33 @@ export class CrmDataLayer {
                   ? serverClientId
                   : shoot.clientId,
             }
+          : shoot,
+      ),
+    };
+  }
+
+  private reconcileClientId(temporaryClientId: number, serverClientId: number) {
+    this.queue = this.queue.map((item) => ({
+      ...item,
+      id: item.id === temporaryClientId ? serverClientId : item.id,
+      data: {
+        ...item.data,
+        ...(Number(item.data.id) === temporaryClientId ? { id: serverClientId } : {}),
+        ...(Number(item.data.clientId) === temporaryClientId
+          ? { clientId: serverClientId }
+          : {}),
+      },
+    }));
+    this.snapshot = {
+      ...this.snapshot,
+      clients: this.snapshot.clients.map((client) =>
+        client.id === temporaryClientId
+          ? { ...client, id: serverClientId }
+          : client,
+      ),
+      shoots: this.snapshot.shoots.map((shoot) =>
+        shoot.clientId === temporaryClientId
+          ? { ...shoot, clientId: serverClientId }
           : shoot,
       ),
     };
@@ -576,7 +705,10 @@ export class CrmDataLayer {
               typeof item.key === "string" &&
               (item.action === "createShoot" ||
                 item.action === "updateShoot" ||
-                item.action === "deleteShoot") &&
+                item.action === "deleteShoot" ||
+                item.action === "createClient" ||
+                item.action === "updateClient" ||
+                item.action === "deleteClient") &&
               isRecord(item.data) &&
               Boolean(normalizeSnapshot(item.before, this.snapshot)),
           )

@@ -1013,12 +1013,14 @@ export function ClientsPage({
   onAdd,
   onEdit,
   onDelete,
+  notify,
 }: {
   clients: Client[];
   shoots: Shoot[];
   onAdd: () => void;
-  onEdit?: (client: Client) => void;
-  onDelete?: (client: Client) => void;
+  onEdit: (client: Client) => void;
+  onDelete: (id: number) => void | Promise<void>;
+  notify: (message: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"all" | Client["kind"]>("all");
@@ -1078,8 +1080,16 @@ export function ClientsPage({
             onOpen={() => setOpenClientId(client.id)}
             onClose={() => setOpenClientId(null)}
             onHintDismiss={swipeHint.dismissHint}
-            onEdit={() => onEdit?.(client)}
-            onDelete={() => onDelete?.(client)}
+            onEdit={() => onEdit(client)}
+            onDelete={() => {
+              if (clientShoots.length) {
+                notify("Клиент связан со съёмками и не может быть удалён");
+                return;
+              }
+              if (window.confirm(`Удалить клиента «${client.name}»?`)) {
+                void onDelete(client.id);
+              }
+            }}
           />;
         })}
         {!filtered.length && (

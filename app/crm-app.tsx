@@ -14,7 +14,7 @@ import {
   INITIAL_CLIENTS,
   INITIAL_SHOOTS,
 } from "./crm-data";
-import { NewClientModal, NewShootModal } from "./crm-modals";
+import { EditClientModal, NewClientModal, NewShootModal } from "./crm-modals";
 import { CalendarPage, ClientsPage, ShootsPage } from "./crm-pages-primary";
 import {
   FinancePage,
@@ -72,6 +72,7 @@ export default function CrmApp() {
   const [shootModal, setShootModal] = useState(false);
   const [shootModalDate, setShootModalDate] = useState<string | undefined>();
   const [clientModal, setClientModal] = useState(false);
+  const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [toast, setToast] = useState("");
   const [syncing, setSyncing] = useState(true);
   const [online, setOnline] = useState(true);
@@ -152,8 +153,42 @@ export default function CrmApp() {
     }
   }
 
-  async function addClient(client: Omit<Client, "id">) {
-    if (await serverAction("createClient", client)) notify("Клиент добавлен");
+  async function addClient(client: Omit<Client, "id">): Promise<MutationResult> {
+    const dataLayer = dataLayerRef.current;
+    if (!dataLayer) {
+      return { ok: false, queued: false, error: "Данные ещё загружаются" };
+    }
+    const result = await dataLayer.createClient(client);
+    if (result.ok) {
+      notify(result.queued ? "Клиент сохранён офлайн" : "Клиент добавлен");
+    } else {
+      notify(result.error || "Не удалось добавить клиента");
+    }
+    return result;
+  }
+
+  async function updateClient(id: number, name: string): Promise<MutationResult> {
+    const dataLayer = dataLayerRef.current;
+    if (!dataLayer) {
+      return { ok: false, queued: false, error: "Данные ещё загружаются" };
+    }
+    const result = await dataLayer.updateClient(id, { name });
+    if (result.ok) {
+      notify(result.queued ? "Имя сохранено офлайн" : "Имя клиента изменено");
+    } else {
+      notify(result.error || "Не удалось изменить клиента");
+    }
+    return result;
+  }
+
+  async function deleteClient(id: number) {
+    const result = await dataLayerRef.current?.deleteClient(id);
+    if (!result) return;
+    if (result.ok) {
+      notify(result.queued ? "Удаление сохранено офлайн" : "Клиент удалён");
+    } else {
+      notify(result.error || "Не удалось удалить клиента");
+    }
   }
 
   async function addShoot(shoot: Omit<Shoot, "id">): Promise<MutationResult> {
@@ -230,6 +265,9 @@ export default function CrmApp() {
             clients={clients}
             shoots={shoots}
             onAdd={() => setClientModal(true)}
+            onEdit={setClientToEdit}
+            onDelete={deleteClient}
+            notify={notify}
           />
         )}
         {tab === "finance" && <FinancePage shoots={shoots} />}
@@ -302,10 +340,14 @@ export default function CrmApp() {
       {clientModal && (
         <NewClientModal
           onClose={() => setClientModal(false)}
-          onSave={(client) => {
-            void addClient(client);
-            setClientModal(false);
-          }}
+          onSave={addClient}
+        />
+      )}
+      {clientToEdit && (
+        <EditClientModal
+          client={clientToEdit}
+          onClose={() => setClientToEdit(null)}
+          onSave={updateClient}
         />
       )}
       {toast && (

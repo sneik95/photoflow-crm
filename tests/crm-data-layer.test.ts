@@ -42,6 +42,14 @@ function snapshot(shoots: Shoot[] = [], clients: Client[] = []): CrmSnapshot {
 }
 
 const sampleShoot = INITIAL_SHOOTS[0];
+const sampleClient: Client = {
+  id: 41,
+  name: sampleShoot.clientName,
+  phone: "+7 900 000-00-00",
+  email: "client@example.com",
+  kind: "person",
+  notes: "Важно",
+};
 
 function json(value: unknown, status = 200) {
   return Response.json(value, { status });
@@ -297,4 +305,58 @@ test("deleting an unsynced temporary shoot removes its create without API delete
   assert.equal(layer.getState().snapshot.shoots.length, 0);
   assert.equal(layer.getState().queued, 0);
   assert.equal(requests, 0);
+});
+
+test("client rename is optimistic, preserves id/data and updates linked shoot name", async () => {
+  const linkedShoot = serverShoot(31, sampleClient.id);
+  let resolveResponse!: (response: Response) => void;
+  const response = new Promise<Response>((resolve) => {
+    resolveResponse = resolve;
+  });
+  const layer = new CrmDataLayer({
+    initialSnapshot: snapshot([linkedShoot], [sampleClient]),
+    online: () => true,
+    fetcher: async () => response,
+  });
+  const operation = layer.updateClient(sampleClient.id, { name: "Новое имя" });
+  const optimistic = layer.getState().snapshot;
+  assert.equal(optimistic.clients[0].id, sampleClient.id);
+  assert.equal(optimistic.clients[0].phone, sampleClient.phone);
+  assert.equal(optimistic.shoots[0].clientId, sampleClient.id);
+  assert.equal(optimistic.shoots[0].clientName, "Новое имя");
+  resolveResponse(json(snapshot(
+    [{ ...linkedShoot, clientName: "Новое имя" }],
+    [{ ...sampleClient, name: "Новое имя" }],
+  )));
+  assert.equal((await operation).ok, true);
+});
+
+test("linked client deletion is rejected without touching shoots or the API", async () => {
+  let requests = 0;
+  const linkedShoot = serverShoot(32, sampleClient.id);
+  const layer = new CrmDataLayer({
+    initialSnapshot: snapshot([linkedShoot], [sampleClient]),
+    online: () => true,
+    fetcher: async () => {
+      requests += 1;
+      return json(snapshot());
+    },
+  });
+  const result = await layer.deleteClient(sampleClient.id);
+  assert.equal(result.ok, false);
+  assert.equal(layer.getState().snapshot.clients.length, 1);
+  assert.equal(layer.getState().snapshot.shoots.length, 1);
+  assert.equal(requests, 0);
+});
+
+test("unlinked client deletion is optimistic and can be queued offline", async () => {
+  const layer = new CrmDataLayer({
+    initialSnapshot: snapshot([], [sampleClient]),
+    online: () => false,
+  });
+  const result = await layer.deleteClient(sampleClient.id);
+  assert.equal(result.ok, true);
+  assert.equal(result.queued, true);
+  assert.equal(layer.getState().snapshot.clients.length, 0);
+  assert.equal(layer.getState().queued, 1);
 });
