@@ -341,6 +341,7 @@ export default function CrmApp() {
         <NewClientModal
           onClose={() => setClientModal(false)}
           onSave={addClient}
+          notify={notify}
         />
       )}
       {clientToEdit && (

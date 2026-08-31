@@ -35,9 +35,11 @@ function normalizedPhone(value: string) {
 export function NewClientModal({
   onClose,
   onSave,
+  notify,
 }: {
   onClose: () => void;
   onSave: (client: Omit<Client, "id">) => Promise<NewShootSaveResult>;
+  notify: (message: string) => void;
 }) {
   const [kind, setKind] = useState<Client["kind"]>("person");
   const [name, setName] = useState("");
@@ -45,6 +47,41 @@ export function NewClientModal({
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+
+  async function chooseContact() {
+    type ContactChoice = { name?: string[]; tel?: string[] };
+    type ContactNavigator = Navigator & {
+      contacts?: {
+        select(
+          properties: Array<"name" | "tel">,
+          options: { multiple: false },
+        ): Promise<ContactChoice[]>;
+      };
+    };
+    const contactNavigator = navigator as ContactNavigator;
+    if (
+      !window.isSecureContext ||
+      !contactNavigator.contacts ||
+      typeof contactNavigator.contacts.select !== "function"
+    ) {
+      notify("Выбор контакта недоступен в этом браузере. Введите данные вручную.");
+      return;
+    }
+    try {
+      const [contact] = await contactNavigator.contacts.select(
+        ["name", "tel"],
+        { multiple: false },
+      );
+      if (!contact) return;
+      const contactName = contact.name?.[0]?.trim();
+      const contactPhone = contact.tel?.[0]?.trim();
+      if (contactName) setName(contactName);
+      if (contactPhone) setPhone(contactPhone);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      notify("Не удалось открыть контакты. Введите данные вручную.");
+    }
+  }
 
   return (
     <Modal title="Новый клиент" onClose={onClose}>
@@ -75,6 +112,13 @@ export function NewClientModal({
             Юрлицо
           </button>
         </div>
+        <button
+          type="button"
+          className="button secondary full"
+          onClick={() => void chooseContact()}
+        >
+          Выбрать из контактов
+        </button>
         <Field label="Имя или название *">
           <input
             required
@@ -86,6 +130,8 @@ export function NewClientModal({
         <div className="form-grid">
           <Field label="Телефон">
             <input
+              type="tel"
+              inputMode="tel"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
               placeholder="+7 900 000-00-00"

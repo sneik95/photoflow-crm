@@ -44,3 +44,22 @@ test("client deletion is guarded in the UI, data layer and API", () => {
 test("renaming a client keeps denormalized shoot names consistent", () => {
   assert.match(apiSource, /\.update\(shoots\)[\s\S]*?\.set\(\{ clientName: name \}\)/);
 });
+
+test("contact picker runs only from an explicit button and never auto-saves", () => {
+  assert.match(modalSource, /type="button"[\s\S]*?onClick=\{\(\) => void chooseContact\(\)\}[\s\S]*?Выбрать из контактов/);
+  const picker = modalSource.slice(
+    modalSource.indexOf("async function chooseContact"),
+    modalSource.indexOf("return (", modalSource.indexOf("async function chooseContact")),
+  );
+  assert.doesNotMatch(picker, /onSave\(/);
+});
+
+test("contact picker is feature-detected and has a manual-entry fallback", () => {
+  assert.match(modalSource, /!window\.isSecureContext/);
+  assert.match(modalSource, /typeof contactNavigator\.contacts\.select !== "function"/);
+  assert.match(modalSource, /\["name", "tel"\]/);
+  assert.match(modalSource, /setName\(contactName\)/);
+  assert.match(modalSource, /setPhone\(contactPhone\)/);
+  assert.match(modalSource, /error\.name === "AbortError"/);
+  assert.match(modalSource, /Введите данные вручную/);
+});
