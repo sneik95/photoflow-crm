@@ -54,6 +54,7 @@ test("settings source keeps swipe actions, confirmation and iPhone input contrac
   const page = readFileSync(new URL("../app/crm-pages-secondary.tsx", import.meta.url), "utf8");
   const css = readFileSync(new URL("../app/crm-light.css", import.meta.url), "utf8");
   const route = readFileSync(new URL("../app/api/crm/route.ts", import.meta.url), "utf8");
+  const ui = readFileSync(new URL("../app/crm-ui.tsx", import.meta.url), "utf8");
 
   assert.match(page, /<SwipeActions open=\{isOpen\} onEdit=\{onEdit\} onDelete=\{onDelete\}/);
   assert.match(page, /window\.confirm/);
@@ -63,6 +64,10 @@ test("settings source keeps swipe actions, confirmation and iPhone input contrac
   assert.match(css, /\.delivery-reminder-input[\s\S]*?font-size: 16px;/);
   assert.match(css, /\.type-row[\s\S]*?touch-action: pan-y;/);
   assert.match(css, /\.swipe-action[\s\S]*?width: 48px;[\s\S]*?height: 48px;[\s\S]*?border-radius: 50%;/);
+  assert.match(page, /useOneTimeSwipeHint/);
+  assert.match(ui, /window\.sessionStorage\.getItem\(key\)/);
+  assert.match(ui, /window\.sessionStorage\.setItem\(key, "1"\)/);
+  assert.match(ui, /setShowHint\(true\)[\s\S]*?setShowHint\(false\)/);
   assert.match(route, /Array\.isArray\(parsed\) \? parsed : DEFAULT_TYPES/);
   assert.match(route, /Number\.isInteger\(reminderDays\) && reminderDays >= 0/);
 });

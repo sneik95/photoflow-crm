@@ -1,11 +1,11 @@
 "use client";
 
-import { CSSProperties, PointerEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { CSSProperties, PointerEvent, ReactNode, useRef, useState } from "react";
 import type { CheckItem, Client, Shoot, TimelineItem } from "./crm-data";
 import { dateRu, deliveryDate, displayColor, money, profitPerHour } from "./crm-data";
 import { addChecklistItem, addTimelineItem, normalizeChecklistItems, normalizeTimelineItems, removeChecklistItem, removeTimelineItem, updateChecklistItem, updateTimelineItem } from "./crm-project-tools";
 import { DEFAULT_SMART_MESSAGES, insertMessageVariable, normalizeSmartMessages, renderSmartMessage, SMART_VARIABLES, type SmartMessage } from "./crm-smart-messages";
-import { Modal, SwipeActions, SWIPE_ACTIONS_WIDTH } from "./crm-ui";
+import { Modal, SwipeActions, SWIPE_ACTIONS_WIDTH, useOneTimeSwipeHint } from "./crm-ui";
 
 const SMART_MESSAGES_STORAGE_KEY = "fotocrm:smart-messages:v1";
 
@@ -38,27 +38,16 @@ async function copyText(value: string, notify: (message: string) => void) {
   catch { notify("Не удалось скопировать ссылку"); }
 }
 
-function useOneTimeSwipeHint(key: string, length: number) {
-  const [hint, setHint] = useState(false);
-  useEffect(() => {
-    if (!length || typeof window === "undefined" || window.sessionStorage.getItem(key)) return;
-    window.sessionStorage.setItem(key, "1");
-    let timeout: number | undefined;
-    const frame = window.requestAnimationFrame(() => { setHint(true); timeout = window.setTimeout(() => setHint(false), 560); });
-    return () => { window.cancelAnimationFrame(frame); if (timeout !== undefined) window.clearTimeout(timeout); };
-  }, [key, length]);
-  return hint;
-}
-
-function ProjectSwipeRow({ open, showHint, onOpenChange, onEdit, onDelete, children }: {
+function ProjectSwipeRow({ open, showHint, onOpenChange, onEdit, onDelete, onHintDismiss, children }: {
   open: boolean; showHint: boolean; onOpenChange: (next: boolean) => void; onEdit: () => void; onDelete: () => void;
+  onHintDismiss: () => void;
   children: (consumeSwipe: boolean) => ReactNode;
 }) {
   const [dragX, setDragX] = useState<number | null>(null);
   const [consumeSwipe, setConsumeSwipe] = useState(false);
   const gesture = useRef<{ id: number; x: number; y: number; horizontal: boolean | null } | null>(null);
   const restingX = open ? -SWIPE_ACTIONS_WIDTH : showHint ? -42 : 0;
-  function pointerDown(event: PointerEvent<HTMLElement>) { if (event.pointerType === "mouse" && event.button !== 0) return; gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, horizontal: null }; event.currentTarget.setPointerCapture(event.pointerId); }
+  function pointerDown(event: PointerEvent<HTMLElement>) { if (event.pointerType === "mouse" && event.button !== 0) return; onHintDismiss(); gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, horizontal: null }; event.currentTarget.setPointerCapture(event.pointerId); }
   function pointerMove(event: PointerEvent<HTMLElement>) {
     const current = gesture.current; if (!current || current.id !== event.pointerId) return;
     const dx = event.clientX - current.x; const dy = event.clientY - current.y;
@@ -78,23 +67,23 @@ function TimelineManager({ items, onChange }: { items: unknown; onChange: (next:
   const timeline = normalizeTimelineItems(items);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ id?: string; label: string; time: string } | null>(null);
-  const showHint = useOneTimeSwipeHint("photoflow:timeline-swipe-hint:v1", timeline.length);
+  const hint = useOneTimeSwipeHint("photoflow:timeline-swipe-hint:v1", timeline.length > 0);
   function saveDraft() {
     if (!draft?.label.trim() || !/^\d{2}:\d{2}$/.test(draft.time)) return;
     const next = draft.id ? updateTimelineItem(timeline, draft.id, { label: draft.label, time: draft.time }) : addTimelineItem(timeline, { id: itemId("timeline"), label: draft.label, time: draft.time, done: false });
     onChange(next); setDraft(null);
   }
-  return <section className="project-manager"><div className="project-manager-heading"><span>Тайминг</span><button type="button" onClick={() => setDraft({ label: "", time: "" })}>+ Добавить этап</button></div>{draft && <div className="project-entry-form"><label><span>Название этапа</span><input autoFocus value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></label><label><span>Время</span><input type="time" value={draft.time} onChange={(event) => setDraft({ ...draft, time: event.target.value })} /></label><div><button type="button" className="button muted" onClick={() => setDraft(null)}>Отменить</button><button type="button" className="button primary" onClick={saveDraft}>{draft.id ? "Сохранить изменения" : "Добавить этап"}</button></div></div>}<div className="project-list day-timeline">{!timeline.length && <p className="project-empty">Этапов пока нет. Добавьте первый этап вручную.</p>}{timeline.map((item, index) => <ProjectSwipeRow key={item.id} open={openId === item.id} showHint={showHint && index === 0} onOpenChange={(open) => setOpenId(open ? item.id : null)} onEdit={() => { setOpenId(null); setDraft({ id: item.id, label: item.label, time: item.time }); }} onDelete={() => { setOpenId(null); onChange(removeTimelineItem(timeline, item.id)); }}>{(consumeSwipe) => <button type="button" className={item.done ? "done" : ""} onClick={() => !consumeSwipe && onChange(updateTimelineItem(timeline, item.id, { done: !item.done }))}><time>{item.time}</time><i /><span>{item.label}</span><b>{item.done ? "Готово" : ""}</b></button>}</ProjectSwipeRow>)}</div></section>;
+  return <section className="project-manager"><div className="project-manager-heading"><span>Тайминг</span><button type="button" onClick={() => setDraft({ label: "", time: "" })}>+ Добавить этап</button></div>{draft && <div className="project-entry-form"><label><span>Название этапа</span><input autoFocus value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></label><label><span>Время</span><input type="time" value={draft.time} onChange={(event) => setDraft({ ...draft, time: event.target.value })} /></label><div><button type="button" className="button muted" onClick={() => setDraft(null)}>Отменить</button><button type="button" className="button primary" onClick={saveDraft}>{draft.id ? "Сохранить изменения" : "Добавить этап"}</button></div></div>}<div className="project-list day-timeline">{!timeline.length && <p className="project-empty">Этапов пока нет. Добавьте первый этап вручную.</p>}{timeline.map((item, index) => <ProjectSwipeRow key={item.id} open={openId === item.id} showHint={hint.showHint && index === 0} onHintDismiss={hint.dismissHint} onOpenChange={(open) => setOpenId(open ? item.id : null)} onEdit={() => { setOpenId(null); setDraft({ id: item.id, label: item.label, time: item.time }); }} onDelete={() => { setOpenId(null); onChange(removeTimelineItem(timeline, item.id)); }}>{(consumeSwipe) => <button type="button" className={item.done ? "done" : ""} onClick={() => !consumeSwipe && onChange(updateTimelineItem(timeline, item.id, { done: !item.done }))}><time>{item.time}</time><i /><span>{item.label}</span><b>{item.done ? "Готово" : ""}</b></button>}</ProjectSwipeRow>)}</div></section>;
 }
 
 function EquipmentManager({ items, onChange }: { items: unknown; onChange: (next: CheckItem[]) => void }) {
   const equipment = normalizeChecklistItems(items);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ id?: string; label: string } | null>(null);
-  const showHint = useOneTimeSwipeHint("photoflow:equipment-swipe-hint:v1", equipment.length);
+  const hint = useOneTimeSwipeHint("photoflow:equipment-swipe-hint:v1", equipment.length > 0);
   const done = equipment.filter((item) => item.done).length;
   function saveDraft() { if (!draft?.label.trim()) return; const next = draft.id ? updateChecklistItem(equipment, draft.id, { label: draft.label }) : addChecklistItem(equipment, draft.label, itemId("equipment")); onChange(next); setDraft(null); }
-  return <section className="project-manager"><div className="project-manager-heading"><span>Техника</span><button type="button" onClick={() => setDraft({ label: "" })}>+ Добавить</button></div>{draft && <div className="project-entry-form"><label><span>Техника или аксессуар</span><input autoFocus value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></label><div><button type="button" className="button muted" onClick={() => setDraft(null)}>Отменить</button><button type="button" className="button primary" onClick={saveDraft}>{draft.id ? "Сохранить изменения" : "Добавить"}</button></div></div>}<div className="project-list day-checklist"><div className="checklist-progress"><span>{done} из {equipment.length}</span><i><b style={{ width: `${equipment.length ? (done / equipment.length) * 100 : 0}%` }} /></i></div>{!equipment.length && <p className="project-empty">Список техники пуст.</p>}{equipment.map((item, index) => <ProjectSwipeRow key={item.id} open={openId === item.id} showHint={showHint && index === 0} onOpenChange={(open) => setOpenId(open ? item.id : null)} onEdit={() => { setOpenId(null); setDraft({ id: item.id, label: item.label }); }} onDelete={() => { setOpenId(null); onChange(removeChecklistItem(equipment, item.id)); }}>{(consumeSwipe) => <label className={`project-check-row${item.done ? " done" : ""}`}><input type="checkbox" checked={item.done} onChange={() => !consumeSwipe && onChange(updateChecklistItem(equipment, item.id, { done: !item.done }))} /><i aria-hidden="true">{item.done ? "✓" : ""}</i><span>{item.label}</span></label>}</ProjectSwipeRow>)}</div></section>;
+  return <section className="project-manager"><div className="project-manager-heading"><span>Техника</span><button type="button" onClick={() => setDraft({ label: "" })}>+ Добавить</button></div>{draft && <div className="project-entry-form"><label><span>Техника или аксессуар</span><input autoFocus value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></label><div><button type="button" className="button muted" onClick={() => setDraft(null)}>Отменить</button><button type="button" className="button primary" onClick={saveDraft}>{draft.id ? "Сохранить изменения" : "Добавить"}</button></div></div>}<div className="project-list day-checklist"><div className="checklist-progress"><span>{done} из {equipment.length}</span><i><b style={{ width: `${equipment.length ? (done / equipment.length) * 100 : 0}%` }} /></i></div>{!equipment.length && <p className="project-empty">Список техники пуст.</p>}{equipment.map((item, index) => <ProjectSwipeRow key={item.id} open={openId === item.id} showHint={hint.showHint && index === 0} onHintDismiss={hint.dismissHint} onOpenChange={(open) => setOpenId(open ? item.id : null)} onEdit={() => { setOpenId(null); setDraft({ id: item.id, label: item.label }); }} onDelete={() => { setOpenId(null); onChange(removeChecklistItem(equipment, item.id)); }}>{(consumeSwipe) => <label className={`project-check-row${item.done ? " done" : ""}`}><input type="checkbox" checked={item.done} onChange={() => !consumeSwipe && onChange(updateChecklistItem(equipment, item.id, { done: !item.done }))} /><i aria-hidden="true">{item.done ? "✓" : ""}</i><span>{item.label}</span></label>}</ProjectSwipeRow>)}</div></section>;
 }
 
 function SmartMessageEditor({ message, onClose, onSave }: { message?: SmartMessage; onClose: () => void; onSave: (next: SmartMessage) => void }) {

@@ -1,6 +1,13 @@
 "use client";
 
-import { CSSProperties, ReactNode, useEffect, useState } from "react";
+import {
+  CSSProperties,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import type { Tab } from "./crm-data";
 
@@ -35,6 +42,42 @@ export function Icon({
 }
 
 export const SWIPE_ACTIONS_WIDTH = 112;
+
+export function useOneTimeSwipeHint(key: string, enabled: boolean) {
+  const [showHint, setShowHint] = useState(false);
+  const timers = useRef<number[]>([]);
+
+  const clearTimers = useCallback(() => {
+    timers.current.forEach((timer) => window.clearTimeout(timer));
+    timers.current = [];
+  }, []);
+
+  const dismissHint = useCallback(() => {
+    clearTimers();
+    setShowHint(false);
+  }, [clearTimers]);
+
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined") return;
+    try {
+      if (
+        window.sessionStorage.getItem(key) ||
+        window.localStorage.getItem(key)
+      ) return;
+      window.sessionStorage.setItem(key, "1");
+    } catch {
+      // Storage is an optional guard; the mounted instance still runs only once.
+    }
+
+    timers.current = [
+      window.setTimeout(() => setShowHint(true), 260),
+      window.setTimeout(() => setShowHint(false), 860),
+    ];
+    return clearTimers;
+  }, [clearTimers, enabled, key]);
+
+  return { showHint, dismissHint };
+}
 
 export function SwipeActions({
   open,

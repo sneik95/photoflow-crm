@@ -77,6 +77,7 @@ test("variable chip replaces the current selection and preserves editor focus co
 
 test("shooting mode uses iPhone-safe input and swipe styles", () => {
   assert.match(lightCss, /\.project-swipe-surface[\s\S]*?touch-action: pan-y;/);
+  assert.match(dayMode, /onHintDismiss=\{hint\.dismissHint\}/);
   assert.match(lightCss, /\.project-entry-form input,[\s\S]*?font-size: 16px;/);
   assert.match(lightCss, /\.smart-message-editor textarea[\s\S]*?min-height: 148px/);
   assert.doesNotMatch(dayMode, /window\.location\.reload|scrollTo\(/);

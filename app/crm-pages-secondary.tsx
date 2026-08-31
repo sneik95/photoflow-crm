@@ -5,7 +5,6 @@ import {
   FormEvent,
   PointerEvent,
   SetStateAction,
-  useEffect,
   useRef,
   useState,
 } from "react";
@@ -34,6 +33,7 @@ import {
   SwipeActions,
   SWIPE_ACTIONS_WIDTH,
   ToggleRow,
+  useOneTimeSwipeHint,
 } from "./crm-ui";
 
 export function FinancePage({ shoots }: { shoots: Shoot[] }) {
@@ -231,6 +231,7 @@ function SwipeableTypeRow({
   onClose,
   onEdit,
   onDelete,
+  onHintDismiss,
   onDraftChange,
   onSaveEdit,
   onCancelEdit,
@@ -244,6 +245,7 @@ function SwipeableTypeRow({
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onHintDismiss: () => void;
   onDraftChange: (patch: Partial<ShootType>) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
@@ -264,6 +266,7 @@ function SwipeableTypeRow({
   function onPointerDown(event: PointerEvent<HTMLElement>) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if ((event.target as HTMLElement).closest(".type-row-controls")) return;
+    onHintDismiss();
     gesture.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -414,24 +417,11 @@ export function SettingsPage({
   );
   const [googleHelp, setGoogleHelp] = useState(false);
   const [openSwipe, setOpenSwipe] = useState<number | null>(null);
-  const [hintedType, setHintedType] = useState<number | null>(null);
   const [editing, setEditing] = useState<TypeEditState>(null);
-
-  useEffect(() => {
-    if (!types.length || typeof window === "undefined") return;
-    const hintKey = "photoflow:settings-types-swipe-hint:v1";
-    if (window.sessionStorage.getItem(hintKey)) return;
-    window.sessionStorage.setItem(hintKey, "1");
-    let timeout: number | undefined;
-    const frame = window.requestAnimationFrame(() => {
-      setHintedType(0);
-      timeout = window.setTimeout(() => setHintedType(null), 560);
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
-      if (timeout !== undefined) window.clearTimeout(timeout);
-    };
-  }, [types.length]);
+  const typeHint = useOneTimeSwipeHint(
+    "photoflow:settings-types-swipe-hint:v1",
+    types.length > 0,
+  );
 
   const deliveryReminderDays = storedDeliveryReminderDays(deliveryReminder);
 
@@ -442,7 +432,7 @@ export function SettingsPage({
 
   function beginEdit(index: number) {
     setOpenSwipe(null);
-    setHintedType(null);
+    typeHint.dismissHint();
     setEditing({ index, draft: { ...types[index] } });
   }
 
@@ -521,12 +511,13 @@ export function SettingsPage({
               type={type}
               index={index}
               isOpen={openSwipe === index}
-              isHinted={hintedType === index}
+              isHinted={typeHint.showHint && index === 0}
               editing={editing}
               onOpen={() => setOpenSwipe(index)}
               onClose={() => setOpenSwipe(null)}
               onEdit={() => beginEdit(index)}
               onDelete={() => void deleteType(index)}
+              onHintDismiss={typeHint.dismissHint}
               onDraftChange={(patch) => setEditing((current) =>
                 current?.index === index
                   ? { ...current, draft: { ...current.draft, ...patch } }

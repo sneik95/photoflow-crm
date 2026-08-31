@@ -504,6 +504,9 @@ fieldset legend { color: var(--pf-muted); }
   border-color: var(--pf-border);
   background: #fff;
 }
+.risk-selection-list .balance-swipe-content.swipe-hint {
+  transition-timing-function: cubic-bezier(.22, 1.35, .36, 1);
+}
 .risk-selection-list .balance-paid-action,
 .risk-selection-list .balance-paid-action:hover {
   border: 0;

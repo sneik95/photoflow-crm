@@ -3,7 +3,6 @@
 import {
   CSSProperties,
   TouchEvent,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -31,7 +30,7 @@ import {
   upcomingCount,
 } from "./crm-shoot-logic";
 import { DayModeModal } from "./crm-day-mode";
-import { Icon, Modal, PageHeader } from "./crm-ui";
+import { Icon, Modal, PageHeader, useOneTimeSwipeHint } from "./crm-ui";
 
 type ShootStatusFilter = ShootListFilter;
 
@@ -494,28 +493,12 @@ function BalanceSwipeRow({
   const [dragOffset, setDragOffset] = useState<number | null>(null);
   const startRef = useRef({ x: 0, y: 0, axis: "" as "" | "x" | "y" });
   const movedRef = useRef(false);
+  const hint = useOneTimeSwipeHint(BALANCE_HINT_KEY, showHint);
 
-  useEffect(() => {
-    if (!showHint) return;
-    try {
-      if (window.localStorage.getItem(BALANCE_HINT_KEY)) return;
-      window.localStorage.setItem(BALANCE_HINT_KEY, "1");
-    } catch {
-      // The hint can safely run once per mount when storage is unavailable.
-    }
-    const reveal = window.setTimeout(() => setDragOffset(-42), 260);
-    const restore = window.setTimeout(() => setDragOffset(0), 820);
-    const finish = window.setTimeout(() => setDragOffset(null), 1100);
-    return () => {
-      window.clearTimeout(reveal);
-      window.clearTimeout(restore);
-      window.clearTimeout(finish);
-    };
-  }, [showHint]);
-
-  const offset = dragOffset ?? (open ? -BALANCE_ACTION_WIDTH : 0);
+  const offset = dragOffset ?? (open ? -BALANCE_ACTION_WIDTH : hint.showHint ? -42 : 0);
 
   function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
+    hint.dismissHint();
     const touch = event.touches[0];
     startRef.current = { x: touch.clientX, y: touch.clientY, axis: "" };
     movedRef.current = false;
@@ -566,7 +549,7 @@ function BalanceSwipeRow({
       </button>
       <button
         type="button"
-        className="balance-swipe-content"
+        className={`balance-swipe-content${hint.showHint ? " swipe-hint" : ""}`}
         style={{ transform: `translate3d(${offset}px, 0, 0)` }}
         onClick={() => {
           if (!movedRef.current) onOpen();
