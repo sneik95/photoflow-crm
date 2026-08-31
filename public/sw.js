@@ -1,4 +1,4 @@
-const CACHE = "photoflow-shell-v5";
+const CACHE = "photoflow-shell-v6-source-build";
 const SHELL = [
   "/",
   "/manifest.webmanifest",

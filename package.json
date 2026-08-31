@@ -16,6 +16,7 @@
     "test:form": "node --test tests/crm-form.test.ts",
     "test:settings": "node --test tests/crm-settings.test.ts",
     "test:shooting": "node --test tests/crm-shooting-mode.test.ts",
+    "test:audit": "node --test tests/crm-final-audit.test.ts",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
   },

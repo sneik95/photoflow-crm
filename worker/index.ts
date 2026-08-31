@@ -29,15 +29,6 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    // PhotoFlow's production client is delivered as a verified Vinext document
-    // snapshot. Serving the root through the older server bundle mixes its RSC
-    // payload with that newer client and prevents React from hydrating on iOS.
-    // Keep API and portal routes on the application worker, but serve the
-    // matching static document for the app shell.
-    if (request.method === "GET" && url.pathname === "/") {
-      return env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
-    }
-
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {

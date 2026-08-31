@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 import test from "node:test";
 
 const developmentPreviewMeta =
@@ -29,5 +30,14 @@ test("renders development preview metadata", async () => {
     response.headers.get("content-type") ?? "",
     /^text\/html\b/i,
   );
-  assert.match(await response.text(), developmentPreviewMeta);
+  const html = await response.text();
+  assert.match(html, developmentPreviewMeta);
+  assert.match(html, /Мои съёмки/);
+  assert.doesNotMatch(html, /Материал без 2-й копии|Удалить все|Резервные копии|Погода и свет/);
+  assert.doesNotMatch(html, /photoflow-hotfix|photoflow-runtime|risk-modal-fix/);
+
+  const assets = readdirSync(new URL("../dist/client/assets/", import.meta.url));
+  assert.ok(assets.some((asset) => asset.endsWith(".js")));
+  assert.ok(assets.some((asset) => asset.endsWith(".css")));
+  assert.equal(assets.some((asset) => /hotfix|runtime-v2|risk-modal-fix/.test(asset)), false);
 });
