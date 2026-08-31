@@ -5,6 +5,7 @@ import {
   createBrowserDataLayer,
   type CrmDataLayer,
   type CrmSnapshot,
+  type MutationResult,
 } from "./crm-data-layer";
 import type { Client, Shoot, Tab } from "./crm-data";
 import {
@@ -147,15 +148,19 @@ export default function CrmApp() {
     if (await serverAction("createClient", client)) notify("Клиент добавлен");
   }
 
-  async function addShoot(shoot: Omit<Shoot, "id">) {
-    const result = await dataLayerRef.current?.createShoot(shoot);
-    if (!result) return;
+  async function addShoot(shoot: Omit<Shoot, "id">): Promise<MutationResult> {
+    const dataLayer = dataLayerRef.current;
+    if (!dataLayer) {
+      return { ok: false, queued: false, error: "Данные ещё загружаются" };
+    }
+    const result = await dataLayer.createShoot(shoot);
     if (result.ok) {
       notify(result.queued ? "Съёмка сохранена офлайн" : "Съёмка добавлена");
       setTab("shoots");
     } else {
       notify(result.error || "Не удалось добавить съёмку");
     }
+    return result;
   }
 
   async function updateShoot(id: number, patch: Partial<Shoot>) {
@@ -273,11 +278,7 @@ export default function CrmApp() {
             setShootModal(false);
             setShootModalDate(undefined);
           }}
-          onSave={(shoot) => {
-            void addShoot(shoot);
-            setShootModal(false);
-            setShootModalDate(undefined);
-          }}
+          onSave={addShoot}
           notify={notify}
         />
       )}

@@ -42,12 +42,17 @@
 }
 .modal.wide { width: min(100%, 760px); }
 @media (max-width: 899px) {
+  .modal-backdrop.fullscreen-backdrop.viewport-aware {
+    top: var(--modal-visible-offset, 0px);
+    bottom: auto;
+    height: var(--modal-visible-height, 100dvh);
+  }
   .modal.fullscreen {
     width: 100vw;
     min-width: 0;
     max-width: 100vw;
-    height: 100dvh;
-    max-height: 100dvh;
+    height: var(--modal-visible-height, 100dvh);
+    max-height: var(--modal-visible-height, 100dvh);
     margin: 0;
     border: 0;
     border-radius: 0;
@@ -91,6 +96,9 @@
   stroke-width: 1.7;
 }
 .modal-form { padding: 22px 24px 34px; }
+.field-invalid > span { color: #cf5b49; }
+.field-invalid input,
+.field-invalid textarea { border-color: #cf5b49; }
 .recognition-box {
   background: rgba(184,148,255,.055);
   border: 1px solid var(--border);

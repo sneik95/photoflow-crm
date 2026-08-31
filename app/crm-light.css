@@ -246,6 +246,7 @@ fieldset legend { color: var(--pf-muted); }
   border-radius: var(--pf-radius-control);
   background: #fff;
   color: var(--pf-text);
+  font-size: 16px;
 }
 
 .field input:focus,
@@ -868,6 +869,10 @@ fieldset legend { color: var(--pf-muted); }
 
 .modal > header .liquid-icon { border: 0 !important; background: transparent !important; color: var(--pf-muted) !important; }
 .modal-form { background: var(--pf-bg); }
+.field-invalid > span { color: #cf5b49; }
+.field-invalid input,
+.field-invalid textarea { border-color: #cf5b49; box-shadow: 0 0 0 3px rgba(207,91,73,.1); }
+.form-save-error { margin: -2px 0 16px; color: #b94b3b; font-size: 14px; line-height: 1.4; }
 .recognition-box,
 .advanced-fields,
 .price-toggle,

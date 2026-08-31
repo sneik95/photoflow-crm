@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { CSSProperties, ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Tab } from "./crm-data";
 
@@ -62,12 +62,14 @@ export function PageHeader({
 export function Field({
   label,
   children,
+  invalid = false,
 }: {
   label: string;
   children: ReactNode;
+  invalid?: boolean;
 }) {
   return (
-    <label className="field">
+    <label className={`field${invalid ? " field-invalid" : ""}`}>
       <span>{label}</span>
       {children}
     </label>
@@ -113,14 +115,20 @@ export function Modal({
   children,
   wide = false,
   fullScreen = false,
+  viewportAware = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
   fullScreen?: boolean;
+  viewportAware?: boolean;
 }) {
   const portalTarget = typeof document === "undefined" ? null : document.body;
+  const [viewport, setViewport] = useState<{
+    height: number;
+    offsetTop: number;
+  }>();
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -130,12 +138,37 @@ export function Modal({
     };
   }, []);
 
+  useEffect(() => {
+    if (!fullScreen || !viewportAware || !window.visualViewport) return;
+    const visualViewport = window.visualViewport;
+    const updateViewport = () =>
+      setViewport({
+        height: Math.round(visualViewport.height),
+        offsetTop: Math.round(visualViewport.offsetTop),
+      });
+    updateViewport();
+    visualViewport.addEventListener("resize", updateViewport);
+    visualViewport.addEventListener("scroll", updateViewport);
+    return () => {
+      visualViewport.removeEventListener("resize", updateViewport);
+      visualViewport.removeEventListener("scroll", updateViewport);
+    };
+  }, [fullScreen, viewportAware]);
+
   if (!portalTarget) return null;
 
   return createPortal(
     <div
-      className={`modal-backdrop${fullScreen ? " fullscreen-backdrop" : ""}`}
+      className={`modal-backdrop${fullScreen ? " fullscreen-backdrop" : ""}${viewportAware ? " viewport-aware" : ""}`}
       role="presentation"
+      style={
+        viewport
+          ? ({
+              "--modal-visible-height": `${viewport.height}px`,
+              "--modal-visible-offset": `${viewport.offsetTop}px`,
+            } as CSSProperties)
+          : undefined
+      }
     >
       <section
         className={`modal ${wide ? "wide" : ""} ${fullScreen ? "fullscreen" : ""}`}

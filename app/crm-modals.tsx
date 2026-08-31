@@ -1,17 +1,29 @@
 "use client";
 
-import { CSSProperties, FormEvent, useState } from "react";
+import {
+  CSSProperties,
+  type FocusEvent,
+  FormEvent,
+  useRef,
+  useState,
+} from "react";
 import type { Client, Shoot, ShootType } from "./crm-data";
 import {
   defaultEquipment,
   displayColor,
   defaultShotList,
-  defaultTimeline,
   money,
 } from "./crm-data";
-import { Field, Icon, Modal, ToggleRow } from "./crm-ui";
+import {
+  initialShootTimeline,
+  NEW_SHOOT_REQUIRED_MESSAGE,
+  type NewShootField,
+  validateNewShoot,
+} from "./crm-new-shoot";
+import { Field, Modal } from "./crm-ui";
 
 type NewShootInput = Omit<Shoot, "id"> & { clientPhone: string };
+type NewShootSaveResult = { ok: boolean; queued?: boolean; error?: string };
 
 function normalizedPhone(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -110,10 +122,9 @@ export function NewShootModal({
   types: ShootType[];
   initialDate?: string;
   onClose: () => void;
-  onSave: (shoot: NewShootInput) => void;
+  onSave: (shoot: NewShootInput) => Promise<NewShootSaveResult>;
   notify: (message: string) => void;
 }) {
-  const [recognition, setRecognition] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const now = new Date();
@@ -121,139 +132,80 @@ export function NewShootModal({
   const [date, setDate] = useState(initialDate || localToday);
   const [start, setStart] = useState("10:00");
   const [end, setEnd] = useState("12:00");
-  const [allDay, setAllDay] = useState(false);
   const [typeName, setTypeName] = useState(types[0]?.name || "Свадьба");
   const [comment, setComment] = useState("");
   const [location, setLocation] = useState("");
-  const [travelMinutes, setTravelMinutes] = useState("30");
+  const [travelMinutes, setTravelMinutes] = useState("");
   const [organizerName, setOrganizerName] = useState("");
   const [organizerPhone, setOrganizerPhone] = useState("");
   const [editingHours, setEditingHours] = useState("6");
   const [travelCost, setTravelCost] = useState("0");
   const [otherCosts, setOtherCosts] = useState("0");
   const [clientGuide, setClientGuide] = useState("");
-  const [attachedImage, setAttachedImage] = useState("");
-  const [withPrice, setWithPrice] = useState(true);
-  const [price, setPrice] = useState("0");
+  const [price, setPrice] = useState("");
   const [paymentType, setPaymentType] =
     useState<Shoot["paymentType"]>("advance");
-  const [paid, setPaid] = useState("0");
-  const selectedType = types.find((type) => type.name === typeName) || types[0];
+  const [paid, setPaid] = useState("");
+  const [errors, setErrors] = useState<Partial<Record<NewShootField, boolean>>>({});
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const inputRefs = useRef<Partial<Record<NewShootField, HTMLInputElement>>>({});
+  const selectedType =
+    types.find((type) => type.name === typeName) ||
+    types[0] ||
+    { name: typeName, color: "#5267FF", deliveryDays: 14 };
 
-  function dictate() {
-    const browserWindow = window as Window & {
-      SpeechRecognition?: new () => {
-        lang: string;
-        interimResults: boolean;
-        start: () => void;
-        onresult: (event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void;
-        onerror: () => void;
-      };
-      webkitSpeechRecognition?: new () => {
-        lang: string;
-        interimResults: boolean;
-        start: () => void;
-        onresult: (event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void;
-        onerror: () => void;
-      };
-    };
-    const Recognition =
-      browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      notify("Голосовой ввод не поддерживается этим браузером");
-      return;
-    }
-    const recognitionApi = new Recognition();
-    recognitionApi.lang = "ru-RU";
-    recognitionApi.interimResults = false;
-    recognitionApi.onresult = (event) => {
-      const text = event.results[0]?.[0]?.transcript || "";
-      setRecognition((current) => `${current} ${text}`.trim());
-      notify("Голос преобразован в текст");
-    };
-    recognitionApi.onerror = () => notify("Не удалось распознать голос");
-    recognitionApi.start();
+  function clearError(field: NewShootField) {
+    setErrors((current) =>
+      current[field] ? { ...current, [field]: false } : current,
+    );
   }
 
-  async function readImage(file: File) {
-    setAttachedImage(file.name);
-    const browserWindow = window as Window & {
-      TextDetector?: new () => {
-        detect: (bitmap: ImageBitmap) => Promise<Array<{ rawValue?: string }>>;
-      };
-    };
-    if (!browserWindow.TextDetector) {
-      notify("Фото прикреплено. OCR зависит от браузера — при необходимости продиктуйте текст");
-      return;
-    }
-    try {
-      const bitmap = await createImageBitmap(file);
-      const blocks = await new browserWindow.TextDetector().detect(bitmap);
-      const text = blocks.map((block) => block.rawValue || "").join("\n").trim();
-      if (text) {
-        setRecognition(text);
-        notify("Текст с изображения распознан");
-      } else {
-        notify("Текст на изображении не найден");
-      }
-    } catch {
-      notify("Не удалось распознать изображение");
-    }
+  function focusInvalidField(field: NewShootField) {
+    const input = inputRefs.current[field];
+    if (!input) return;
+    input.focus({ preventScroll: true });
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        input.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }),
+      ),
+    );
   }
 
-  function recognize() {
-    if (!recognition.trim()) {
-      notify("Вставьте сообщение клиента");
+  function keepFocusedFieldVisible(event: FocusEvent<HTMLElement>) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) && !(input instanceof HTMLTextAreaElement)) {
       return;
     }
-    const lower = recognition.toLowerCase();
-    const foundType = types.find((type) =>
-      lower.includes(type.name.toLowerCase()),
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        input.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }),
+      ),
     );
-    if (foundType) setTypeName(foundType.name);
-
-    const dateMatch = recognition.match(
-      /(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/,
-    );
-    if (dateMatch) {
-      setDate(
-        `${dateMatch[3]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[1].padStart(2, "0")}`,
-      );
-    }
-    const times = [...recognition.matchAll(/(?:в\s*)?(\d{1,2}):(\d{2})/g)];
-    if (times[0]) setStart(`${times[0][1].padStart(2, "0")}:${times[0][2]}`);
-    if (times[1]) setEnd(`${times[1][1].padStart(2, "0")}:${times[1][2]}`);
-
-    const priceMatch = recognition.match(
-      /(?:стоимость|цена|за|₽)\s*[:—-]?\s*(\d[\d\s]{2,})|((?:\d[\d\s]{2,}))\s*(?:₽|руб)/i,
-    );
-    if (priceMatch) {
-      setPrice((priceMatch[1] || priceMatch[2]).replace(/\s/g, ""));
-    }
-    const knownClient = clients.find((client) =>
-      lower.includes(client.name.toLowerCase().split(" ")[0]),
-    );
-    if (knownClient) {
-      setClientName(knownClient.name);
-      setClientPhone(knownClient.phone);
-    } else {
-      const phoneMatch = recognition.match(/(?:\+7|8)[\d\s()\-]{9,}/);
-      if (phoneMatch) setClientPhone(phoneMatch[0].trim());
-    }
-    const locationMatch = recognition.match(
-      /(?:локация|адрес|место)\s*[:—-]\s*([^\n,;]+)/i,
-    );
-    if (locationMatch) setLocation(locationMatch[1].trim());
-    setComment(recognition.trim());
-    notify("Поля заполнены — проверьте результат");
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!clientName.trim()) {
-      notify("Укажите клиента");
+    const invalidFields = validateNewShoot({
+      clientName,
+      clientPhone,
+      location,
+      price,
+      paymentType,
+      advance: paid,
+    });
+    if (invalidFields.length) {
+      setErrors(
+        Object.fromEntries(invalidFields.map((field) => [field, true])) as Partial<
+          Record<NewShootField, boolean>
+        >,
+      );
+      notify(NEW_SHOOT_REQUIRED_MESSAGE);
+      focusInvalidField(invalidFields[0]);
       return;
     }
+    setSaveError("");
+    setSaving(true);
     const normalizedClientPhone = normalizedPhone(clientPhone);
     const client = clients.find(
       (item) =>
@@ -262,76 +214,57 @@ export function NewShootModal({
         (!!normalizedClientPhone &&
           normalizedPhone(item.phone) === normalizedClientPhone),
     );
-    onSave({
-      clientId: client?.id || null,
-      clientName: clientName.trim(),
-      clientPhone: clientPhone.trim(),
-      type: typeName,
-      color: selectedType.color,
-      startAt: `${date}T${allDay ? "00:00" : start}`,
-      endAt: `${date}T${allDay ? "23:59" : end}`,
-      allDay,
-      comment,
-      price: withPrice ? Number(price) : 0,
-      paymentType,
-      paidAmount:
-        paymentType === "full" ? Number(price) : Number(paid),
-      deliveryDays: selectedType.deliveryDays,
-      delivered: false,
-      archived: false,
-      status: "booked",
-      location,
-      travelMinutes: Number(travelMinutes),
-      organizerName,
-      organizerPhone,
-      editingHours: Number(editingHours),
-      travelCost: Number(travelCost),
-      otherCosts: Number(otherCosts),
-      equipment: defaultEquipment(typeName),
-      shotList: defaultShotList(typeName),
-      timeline: defaultTimeline(start, end, typeName),
-      backupStatus: "none",
-      portalToken: "",
-      clientGuide,
-    });
+    let result: NewShootSaveResult;
+    try {
+      result = await onSave({
+        clientId: client?.id || null,
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        type: typeName,
+        color: selectedType.color,
+        startAt: `${date}T${start}`,
+        endAt: `${date}T${end}`,
+        allDay: false,
+        comment,
+        price: Number(price),
+        paymentType,
+        paidAmount:
+          paymentType === "full" ? Number(price) : Number(paid || 0),
+        deliveryDays: selectedType.deliveryDays,
+        delivered: false,
+        archived: false,
+        status: "booked",
+        location: location.trim(),
+        travelMinutes: Number(travelMinutes || 0),
+        organizerName,
+        organizerPhone,
+        editingHours: Number(editingHours),
+        travelCost: Number(travelCost),
+        otherCosts: Number(otherCosts),
+        equipment: defaultEquipment(typeName),
+        shotList: defaultShotList(typeName),
+        timeline: initialShootTimeline(`${date}T${start}`),
+        backupStatus: "none",
+        portalToken: "",
+        clientGuide,
+      });
+    } catch {
+      result = { ok: false, error: "Не удалось сохранить съёмку. Повторите попытку." };
+    } finally {
+      setSaving(false);
+    }
+    if (!result.ok) {
+      setSaveError(result.error || "Не удалось сохранить съёмку. Проверьте подключение и повторите.");
+      return;
+    }
+    onClose();
   }
 
   return (
-    <Modal title="Новая съёмка" onClose={onClose} wide fullScreen>
-      <form className="modal-form" onSubmit={submit}>
-        <div className="recognition-box">
-          <div className="recognition-title">
-            <Icon name="spark" />
-            <strong>Умное распознавание</strong>
-            <span>необязательно</span>
-          </div>
-          <textarea
-            value={recognition}
-            onChange={(event) => setRecognition(event.target.value)}
-            placeholder="Вставьте переписку: «Алёна, свадьба 22.08.2026 в 14:00, стоимость 69 000 ₽…»"
-          />
-          <button type="button" className="button primary" onClick={recognize}>
-            Распознать
-          </button>
-          <div className="recognition-actions">
-            <button type="button" onClick={dictate}>🎙 Продиктовать</button>
-            <label>
-              📷 Прикрепить скрин
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) readImage(file);
-                }}
-              />
-            </label>
-          </div>
-          {attachedImage && <small className="attached-file">Прикреплено: {attachedImage}</small>}
-        </div>
-
+    <Modal title="Новая съёмка" onClose={onClose} wide fullScreen viewportAware>
+      <form className="modal-form" onSubmit={submit} onFocusCapture={keepFocusedFieldVisible}>
         <div className="form-grid client-fields">
-          <Field label="Имя клиента *">
+          <Field label="Имя клиента *" invalid={errors.clientName}>
             <input
               list="client-names"
               required
@@ -353,8 +286,12 @@ export function NewShootModal({
                 } else if (previousClient) {
                   setClientPhone("");
                 }
+                clearError("clientName");
               }}
-              placeholder="Например, Иванов Иван"
+              ref={(node) => {
+                inputRefs.current.clientName = node || undefined;
+              }}
+              placeholder="Иванов Иван Иванович"
             />
             <datalist id="client-names">
               {clients.map((client) => (
@@ -364,10 +301,11 @@ export function NewShootModal({
               ))}
             </datalist>
           </Field>
-          <Field label="Телефон">
+          <Field label="Телефон *" invalid={errors.clientPhone}>
             <input
               type="tel"
               inputMode="tel"
+              required
               list="client-phones"
               value={clientPhone}
               onChange={(event) => {
@@ -382,6 +320,10 @@ export function NewShootModal({
                   setClientName(selectedClient.name);
                   setClientPhone(selectedClient.phone);
                 }
+                clearError("clientPhone");
+              }}
+              ref={(node) => {
+                inputRefs.current.clientPhone = node || undefined;
               }}
               placeholder="+7 900 000-00-00"
             />
@@ -397,11 +339,6 @@ export function NewShootModal({
           </Field>
         </div>
 
-        <ToggleRow
-          title="Весь день"
-          subtitle="Для свадеб и длинных съёмок"
-          onChange={setAllDay}
-        />
         <div className="form-grid date-grid">
           <Field label="Дата">
             <input
@@ -413,7 +350,6 @@ export function NewShootModal({
           <Field label="Начало">
             <input
               type="time"
-              disabled={allDay}
               value={start}
               onChange={(event) => setStart(event.target.value)}
             />
@@ -421,7 +357,6 @@ export function NewShootModal({
           <Field label="Конец">
             <input
               type="time"
-              disabled={allDay}
               value={end}
               onChange={(event) => setEnd(event.target.value)}
             />
@@ -444,10 +379,17 @@ export function NewShootModal({
         </fieldset>
 
         <div className="form-grid">
-          <Field label="Локация или адрес">
+          <Field label="Локация или адрес *" invalid={errors.location}>
             <input
+              required
               value={location}
-              onChange={(event) => setLocation(event.target.value)}
+              onChange={(event) => {
+                setLocation(event.target.value);
+                clearError("location");
+              }}
+              ref={(node) => {
+                inputRefs.current.location = node || undefined;
+              }}
               placeholder="Абрау-Дюрсо, площадка…"
             />
           </Field>
@@ -457,6 +399,7 @@ export function NewShootModal({
               min="0"
               value={travelMinutes}
               onChange={(event) => setTravelMinutes(event.target.value)}
+              placeholder="Например, 30"
             />
           </Field>
         </div>
@@ -505,69 +448,82 @@ export function NewShootModal({
             />
           </Field>
         </details>
-        <button
-          type="button"
-          className="toggle-row price-toggle"
-          onClick={() => setWithPrice(!withPrice)}
-        >
-          <span><strong>Указать стоимость</strong><small>Необязательно</small></span>
-          <i className={withPrice ? "on" : ""}><b /></i>
-        </button>
-
-        {withPrice && (
-          <>
-            <Field label="Стоимость съёмки">
-              <input
-                type="number"
-                min="0"
-                value={price}
-                onChange={(event) => setPrice(event.target.value)}
-              />
-            </Field>
-            <fieldset className="payment-selector">
-              <legend>Тип оплаты</legend>
-              {(["advance", "full", "postpay"] as const).map((value) => (
-                <button
-                  type="button"
-                  className={paymentType === value ? "active" : ""}
-                  onClick={() => setPaymentType(value)}
-                  key={value}
-                >
-                  {value === "advance"
-                    ? "Аванс"
-                    : value === "full"
-                      ? "Полная"
-                      : "Постоплата"}
-                </button>
-              ))}
-            </fieldset>
-            {paymentType === "advance" && (
-              <Field label="Сумма аванса">
-                <input
-                  type="number"
-                  min="0"
-                  max={price}
-                  value={paid}
-                  onChange={(event) => setPaid(event.target.value)}
-                />
-              </Field>
-            )}
-            <div className="balance">
-              <span>Остаток к оплате</span>
-              <strong>
-                {money(
-                  Math.max(
-                    0,
-                    Number(price) -
-                      (paymentType === "full" ? Number(price) : Number(paid)),
-                  ),
-                )}
-              </strong>
-            </div>
-          </>
+        <Field label="Стоимость съёмки *" invalid={errors.price}>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            step="1"
+            required
+            value={price}
+            onChange={(event) => {
+              setPrice(event.target.value);
+              clearError("price");
+            }}
+            ref={(node) => {
+              inputRefs.current.price = node || undefined;
+            }}
+            placeholder="Например, 25 000"
+            enterKeyHint={paymentType === "advance" ? "next" : "done"}
+          />
+        </Field>
+        <fieldset className="payment-selector">
+          <legend>Тип оплаты</legend>
+          {(["advance", "full", "postpay"] as const).map((value) => (
+            <button
+              type="button"
+              className={paymentType === value ? "active" : ""}
+              onClick={() => {
+                setPaymentType(value);
+                if (value !== "advance") clearError("advance");
+              }}
+              key={value}
+            >
+              {value === "advance"
+                ? "Аванс"
+                : value === "full"
+                  ? "Полная"
+                  : "Постоплата"}
+            </button>
+          ))}
+        </fieldset>
+        {paymentType === "advance" && (
+          <Field label="Сумма аванса *" invalid={errors.advance}>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              max={price || undefined}
+              step="1"
+              required
+              value={paid}
+              onChange={(event) => {
+                setPaid(event.target.value);
+                clearError("advance");
+              }}
+              ref={(node) => {
+                inputRefs.current.advance = node || undefined;
+              }}
+              placeholder="Например, 5 000"
+              enterKeyHint="done"
+            />
+          </Field>
         )}
-        <button className="button primary full large-button">
-          Добавить съёмку
+        <div className="balance">
+          <span>Остаток к оплате</span>
+          <strong>
+            {money(
+              Math.max(
+                0,
+                Number(price || 0) -
+                  (paymentType === "full" ? Number(price || 0) : Number(paid || 0)),
+              ),
+            )}
+          </strong>
+        </div>
+        {saveError && <p className="form-save-error" role="alert">{saveError}</p>}
+        <button className="button primary full large-button" disabled={saving}>
+          {saving ? "Сохраняю…" : "Добавить съёмку"}
         </button>
       </form>
     </Modal>
