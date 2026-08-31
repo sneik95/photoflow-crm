@@ -402,6 +402,8 @@ fieldset legend { color: var(--pf-muted); }
   gap: 10px;
 }
 
+.shoot-day-metrics.single > div { flex: 1 1 100%; }
+
 .shoot-day-metrics > div {
   min-width: 128px;
   padding: 12px 14px;

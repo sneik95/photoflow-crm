@@ -34,6 +34,57 @@ export function isProcessing(shoot: Shoot, now: Date) {
   return !shootIsDelivered(shoot) && new Date(shoot.startAt).getTime() < now.getTime();
 }
 
+export type DashboardHero = {
+  kind: "shoot" | "processing";
+  shoot: Shoot;
+};
+
+function deterministicShootOrder(dateFor: (shoot: Shoot) => Date) {
+  return (a: Shoot, b: Shoot) => {
+    const dateDifference = dateFor(a).getTime() - dateFor(b).getTime();
+    if (dateDifference) return dateDifference;
+    const startDifference = new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+    if (startDifference) return startDifference;
+    const idDifference = a.id - b.id;
+    return idDifference || a.clientName.localeCompare(b.clientName, "ru");
+  };
+}
+
+export function selectDashboardHero(
+  shoots: Shoot[],
+  now: Date,
+): DashboardHero | undefined {
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() + 30);
+
+  const upcoming = shoots
+    .filter((shoot) => {
+      const start = new Date(shoot.startAt).getTime();
+      return (
+        !shootIsDelivered(shoot) &&
+        Number.isFinite(start) &&
+        start >= now.getTime() &&
+        start <= cutoff.getTime()
+      );
+    })
+    .slice()
+    .sort(deterministicShootOrder((shoot) => new Date(shoot.startAt)))[0];
+
+  if (upcoming) return { kind: "shoot", shoot: upcoming };
+
+  const processing = shoots
+    .filter((shoot) => isProcessing(shoot, now))
+    .slice()
+    .sort(deterministicShootOrder(shootDeadline))[0];
+
+  return processing ? { kind: "processing", shoot: processing } : undefined;
+}
+
+export function hasTravelTime(value: unknown) {
+  const minutes = Number(value);
+  return Number.isFinite(minutes) && minutes > 0;
+}
+
 export function isUrgent(shoot: Shoot, now: Date) {
   if (shootIsDelivered(shoot)) return false;
   const days = calendarDaysBetween(now, shootDeadline(shoot));

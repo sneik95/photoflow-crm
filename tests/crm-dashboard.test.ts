@@ -4,10 +4,12 @@ import test from "node:test";
 import { INITIAL_SHOOTS, type Shoot } from "../app/crm-data.ts";
 import {
   filterShoots,
+  hasTravelTime,
   isOverdue,
   isUrgent,
   processingCount,
   projectCountLabel,
+  selectDashboardHero,
   shootDeadline,
   unpaidShoots,
   upcomingCount,
@@ -121,6 +123,47 @@ test("project counter uses correct Russian declension", () => {
     [25, "25 проектов"],
   ] as const;
   expected.forEach(([value, label]) => assert.equal(projectCountLabel(value), label));
+});
+
+test("dashboard hero uses only an undelivered shoot within the next 30 calendar days", () => {
+  const past = atDays(-1, { id: 1 });
+  const near = atDays(12, { id: 2 });
+  const far = atDays(31, { id: 3 });
+  const deliveredNear = atDays(2, { id: 4, delivered: true, status: "delivered" });
+  assert.deepEqual(selectDashboardHero([far, past, deliveredNear, near], now), {
+    kind: "shoot",
+    shoot: near,
+  });
+});
+
+test("dashboard hero includes the exact 30-calendar-day boundary", () => {
+  const boundary = atDays(30, { id: 30 });
+  assert.equal(selectDashboardHero([boundary], now)?.shoot.id, boundary.id);
+});
+
+test("dashboard hero falls back to the nearest processing deadline deterministically", () => {
+  const laterDeadline = atDays(-4, { id: 9, deliveryDays: 10 });
+  const nearestDeadline = atDays(-3, { id: 7, deliveryDays: 4 });
+  const sameDeadlineHigherId = atDays(-3, { id: 8, deliveryDays: 4 });
+  const result = selectDashboardHero(
+    [laterDeadline, sameDeadlineHigherId, nearestDeadline],
+    now,
+  );
+  assert.equal(result?.kind, "processing");
+  assert.equal(result?.shoot.id, nearestDeadline.id);
+});
+
+test("dashboard hero has no arbitrary fallback when nothing qualifies", () => {
+  const deliveredPast = atDays(-2, { id: 1, delivered: true, status: "delivered" });
+  const farFuture = atDays(31, { id: 2 });
+  assert.equal(selectDashboardHero([deliveredPast, farFuture], now), undefined);
+});
+
+test("departure badge requires a real positive travel duration", () => {
+  assert.equal(hasTravelTime(25), true);
+  for (const value of [0, null, undefined, "", Number.NaN, -5]) {
+    assert.equal(hasTravelTime(value), false);
+  }
 });
 
 test("radar source has only balance risk and opens the balance sheet for one client", async () => {

@@ -19,9 +19,11 @@ import {
   calendarDaysBetween,
   clientCountLabel,
   filterShoots,
+  hasTravelTime,
   isOverdue,
   processingCount,
   projectCountLabel,
+  selectDashboardHero,
   shootDeadline,
   shootIsDelivered,
   type ShootListFilter,
@@ -124,14 +126,9 @@ export function ShootsPage({
     })
     .reduce((sum, shoot) => sum + shoot.price, 0);
   const processing = processingCount(shoots, now);
-  const focusShoot = shoots
-    .filter((shoot) => !shootIsDelivered(shoot))
-    .slice()
-    .sort((a, b) => {
-      const aFuture = new Date(a.startAt) >= now ? 0 : 1;
-      const bFuture = new Date(b.startAt) >= now ? 0 : 1;
-      return aFuture - bFuture || a.startAt.localeCompare(b.startAt);
-    })[0];
+  const hero = selectDashboardHero(shoots, now);
+  const focusShoot = hero?.shoot;
+  const showDeparture = focusShoot && hasTravelTime(focusShoot.travelMinutes);
   const dayShoot = shoots.find((shoot) => shoot.id === dayShootId);
 
   const balances = useMemo(() => unpaidShoots(shoots), [shoots]);
@@ -155,7 +152,9 @@ export function ShootsPage({
         >
           <div className="shoot-day-photo" aria-hidden="true" />
           <div className="shoot-day-copy">
-            <span className="shoot-day-kicker">Ближайшая съёмка</span>
+            <span className="shoot-day-kicker">
+              {hero?.kind === "processing" ? "Ближайшая обработка" : "Ближайшая съёмка"}
+            </span>
             <h2>{focusShoot.clientName}</h2>
             <p>
               {dateRu(focusShoot.startAt)} ·{" "}
@@ -168,8 +167,10 @@ export function ShootsPage({
               <span>{focusShoot.type}</span>
             </div>
           </div>
-          <div className="shoot-day-metrics">
-            <div><span>Выехать в</span><strong>{departureTime(focusShoot)}</strong></div>
+          <div className={`shoot-day-metrics${showDeparture ? "" : " single"}`}>
+            {showDeparture && (
+              <div><span>Выехать в</span><strong>{departureTime(focusShoot)}</strong></div>
+            )}
             <div className="shoot-price-metric">
               <span>Стоимость</span>
               <strong>{money(focusShoot.price)}</strong>
