@@ -5,6 +5,34 @@
   color: var(--muted);
   font-weight: 600;
 }
+.finance-year-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -10px 0;
+}
+.finance-year-select select {
+  min-height: 44px;
+  padding: 8px 28px 8px 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.finance-year-select::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  opacity: .58;
+  pointer-events: none;
+}
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

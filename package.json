@@ -15,6 +15,7 @@
     "test:dashboard": "node --test tests/crm-dashboard.test.ts",
     "test:form": "node --test tests/crm-form.test.ts",
     "test:clients": "node --test tests/crm-clients.test.ts",
+    "test:finance": "node --test tests/crm-finance.test.ts",
     "test:settings": "node --test tests/crm-settings.test.ts",
     "test:shooting": "node --test tests/crm-shooting-mode.test.ts",
     "test:audit": "node --test tests/crm-final-audit.test.ts",

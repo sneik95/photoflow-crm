@@ -15,6 +15,11 @@ import {
   profitPerHour,
   shootDurationHours,
 } from "./crm-data";
+import {
+  availableFinanceYears,
+  shootsInCurrentMonth,
+  shootsInFinanceYear,
+} from "./crm-finance";
 import { downloadCrmExcel } from "./excel-export";
 import {
   deliveryReminderSetting,
@@ -37,19 +42,27 @@ import {
 export function FinancePage({ shoots }: { shoots: Shoot[] }) {
   const now = new Date();
   const currentYear = now.getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const availableYears = availableFinanceYears(shoots, currentYear);
+  const yearShoots = shootsInFinanceYear(shoots, selectedYear);
+  const isCurrentYear = selectedYear === currentYear;
   const currentMonth = new Intl.DateTimeFormat("ru-RU", {
     month: "short",
     year: "numeric",
   }).format(now);
-  const total = shoots.reduce((sum, shoot) => sum + shoot.price, 0);
-  const received = shoots.reduce((sum, shoot) => sum + shoot.paidAmount, 0);
+  const total = yearShoots.reduce((sum, shoot) => sum + shoot.price, 0);
+  const currentMonthTotal = shootsInCurrentMonth(shoots, now).reduce(
+    (sum, shoot) => sum + shoot.price,
+    0,
+  );
+  const received = yearShoots.reduce((sum, shoot) => sum + shoot.paidAmount, 0);
   const expected = total - received;
-  const totalCosts = shoots.reduce(
+  const totalCosts = yearShoots.reduce(
     (sum, shoot) => sum + shoot.travelCost + shoot.otherCosts,
     0,
   );
   const netProfit = total - totalCosts;
-  const totalHours = shoots.reduce(
+  const totalHours = yearShoots.reduce(
     (sum, shoot) =>
       sum +
       shootDurationHours(shoot) +
@@ -60,7 +73,7 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
   const averageProfitHour = totalHours ? Math.round(netProfit / totalHours) : 0;
   const annualGoal = 2_500_000;
   const byType = Object.entries(
-    shoots.reduce<Record<string, number>>(
+    yearShoots.reduce<Record<string, number>>(
       (acc, shoot) => ({
         ...acc,
         [shoot.type]: (acc[shoot.type] || 0) + shoot.price,
@@ -73,30 +86,46 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
     <section className="page">
       <PageHeader
         title="Финансы"
-        subtitle={`${currentYear} год`}
-        action={
-          <span className="currency" aria-label="Валюта: рубли">
-            ₽ Рубли
-          </span>
+        subtitle={
+          <label className="finance-year-select">
+            <select
+              aria-label="Год финансовой сводки"
+              value={selectedYear}
+              onChange={(event) => setSelectedYear(Number(event.target.value))}
+            >
+              {availableYears.map((year) => (
+                <option key={year} value={year}>{year} год</option>
+              ))}
+            </select>
+          </label>
         }
       />
       <div className="kpi-grid">
         <article>
           <span>Всего за год</span><strong>{money(total)}</strong>
-          <p>{shoots.length} проектов</p>
+          <p>{yearShoots.length} проектов</p>
         </article>
+        {isCurrentYear ? (
+          <article>
+            <span>Текущий месяц</span><strong className="green-text">{money(currentMonthTotal)}</strong>
+            <p>{currentMonth}</p>
+          </article>
+        ) : (
+          <article>
+            <span>Прибыль в час</span><strong>{money(averageProfitHour)}</strong>
+            <p>{Math.round(totalHours)} ч. вместе с обработкой</p>
+          </article>
+        )}
         <article>
-          <span>Текущий месяц</span><strong className="green-text">{money(total)}</strong>
-          <p>{currentMonth}</p>
+          <span>Проектов всего</span><strong>{yearShoots.length}</strong>
+          <p>в {selectedYear} году</p>
         </article>
-        <article>
-          <span>Проектов всего</span><strong>{shoots.length}</strong>
-          <p>в {currentYear} году</p>
-        </article>
-        <article>
-          <span>Прибыль в час</span><strong>{money(averageProfitHour)}</strong>
-          <p>{Math.round(totalHours)} ч. вместе с обработкой</p>
-        </article>
+        {isCurrentYear && (
+          <article>
+            <span>Прибыль в час</span><strong>{money(averageProfitHour)}</strong>
+            <p>{Math.round(totalHours)} ч. вместе с обработкой</p>
+          </article>
+        )}
       </div>
 
       <div className="panel time-economics">
@@ -113,7 +142,7 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
           <div><span>Среднее</span><strong>{money(averageProfitHour)}/ч</strong></div>
         </div>
         <div className="profitability-list">
-          {shoots
+          {yearShoots
             .slice()
             .sort((a, b) => profitPerHour(b) - profitPerHour(a))
             .map((shoot, index) => {
@@ -133,7 +162,7 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
               );
             })}
         </div>
-        {!!shoots.length && (
+        {!!yearShoots.length && (
           <p className="economics-tip">
             Подсказка: сравнивайте прибыль в час, а не только стоимость пакета — так легче понять, какие съёмки стоит продвигать.
           </p>
@@ -175,7 +204,7 @@ export function FinancePage({ shoots }: { shoots: Shoot[] }) {
           </span>
         </div>
         <div className="finance-shoots">
-          {shoots.map((shoot) => (
+          {yearShoots.map((shoot) => (
             <article key={shoot.id}>
               <div>
                 <h3>{shoot.clientName}</h3>
