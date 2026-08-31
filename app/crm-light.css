@@ -792,31 +792,38 @@ fieldset legend { color: var(--pf-muted); }
   overflow: hidden;
   border-radius: 18px;
 }
-.type-swipe-actions {
+.swipe-actions {
   position: absolute;
   inset: 0 0 0 auto;
-  width: 178px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: stretch;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 18px;
+  width: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-inline: 4px;
   background: #eef2ff;
 }
-.type-swipe-actions button {
-  min-width: 0;
-  min-height: 56px;
-  padding: 10px 6px;
+.swipe-action {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 0;
-  border-radius: 13px;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
+  border-radius: 50%;
 }
-.type-swipe-edit { color: #3e55d8; background: #dfe5ff; }
-.type-swipe-delete { color: #b94e3b; background: #ffe6df; }
+.swipe-action svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.swipe-action-edit { color: #3e55d8; background: #dfe5ff; }
+.swipe-action-delete { color: #b94e3b; background: #ffe6df; }
 .type-row {
   position: relative;
   z-index: 1;
@@ -1049,29 +1056,6 @@ fieldset legend { color: var(--pf-muted); }
 .project-list { overflow: hidden; border-radius: 17px; }
 .project-empty { margin: 0; padding: 16px; color: var(--pf-muted); font-size: 14px; }
 .project-swipe-shell { position: relative; overflow: hidden; }
-.project-swipe-actions {
-  position: absolute;
-  inset: 0 0 0 auto;
-  width: 178px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 6px;
-  background: #eef2ff;
-}
-.project-swipe-actions button {
-  min-width: 0;
-  min-height: 52px;
-  padding: 8px 5px;
-  border: 0;
-  border-radius: 13px;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
-}
-.project-swipe-edit { background: #dfe5ff; color: #3e55d8; }
-.project-swipe-delete { background: #ffe6df; color: #b94e3b; }
 .project-swipe-surface {
   position: relative;
   z-index: 1;

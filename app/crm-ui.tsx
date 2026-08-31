@@ -34,6 +34,47 @@ export function Icon({
   );
 }
 
+export const SWIPE_ACTIONS_WIDTH = 112;
+
+export function SwipeActions({
+  open,
+  onEdit,
+  onDelete,
+}: {
+  open: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="swipe-actions" aria-hidden={!open}>
+      <button
+        type="button"
+        className="swipe-action swipe-action-edit"
+        aria-label="Изменить"
+        title="Изменить"
+        onClick={onEdit}
+        tabIndex={open ? 0 : -1}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 20h4l10.7-10.7a2.1 2.1 0 00-3-3L5 17v3zm10.2-12.2l3 3" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="swipe-action swipe-action-delete"
+        aria-label="Удалить"
+        title="Удалить"
+        onClick={onDelete}
+        tabIndex={open ? 0 : -1}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 7h16M9 7V4h6v3m-9 0l1 13h10l1-13M10 11v5m4-5v5" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export function PageHeader({
   title,
   subtitle,

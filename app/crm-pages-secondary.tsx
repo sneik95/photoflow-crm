@@ -27,7 +27,14 @@ import {
   removeShootType,
   storedDeliveryReminderDays,
 } from "./crm-settings";
-import { Field, Icon, PageHeader, ToggleRow } from "./crm-ui";
+import {
+  Field,
+  Icon,
+  PageHeader,
+  SwipeActions,
+  SWIPE_ACTIONS_WIDTH,
+  ToggleRow,
+} from "./crm-ui";
 
 export function FinancePage({ shoots }: { shoots: Shoot[] }) {
   const now = new Date();
@@ -249,7 +256,7 @@ function SwipeableTypeRow({
     horizontal: boolean | null;
   } | null>(null);
   const didSwipe = useRef(false);
-  const actionsWidth = 178;
+  const actionsWidth = SWIPE_ACTIONS_WIDTH;
   const editDraft = editing?.index === index ? editing.draft : null;
   const restingX = isOpen ? -actionsWidth : isHinted ? -42 : 0;
   const translateX = dragX === null ? restingX : dragX;
@@ -296,14 +303,7 @@ function SwipeableTypeRow({
 
   return (
     <div className="type-swipe-shell">
-      <div className="type-swipe-actions" aria-hidden={!isOpen}>
-        <button type="button" className="type-swipe-edit" onClick={onEdit} tabIndex={isOpen ? 0 : -1}>
-          Изменить
-        </button>
-        <button type="button" className="type-swipe-delete" onClick={onDelete} tabIndex={isOpen ? 0 : -1}>
-          Удалить
-        </button>
-      </div>
+      <SwipeActions open={isOpen} onEdit={onEdit} onDelete={onDelete} />
       <article
         className={`type-row${editDraft ? " expanded" : ""}${isHinted ? " swipe-hint" : ""}`}
         style={{ transform: `translateX(${translateX}px)` }}

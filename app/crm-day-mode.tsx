@@ -5,9 +5,8 @@ import type { CheckItem, Client, Shoot, TimelineItem } from "./crm-data";
 import { dateRu, deliveryDate, displayColor, money, profitPerHour } from "./crm-data";
 import { addChecklistItem, addTimelineItem, normalizeChecklistItems, normalizeTimelineItems, removeChecklistItem, removeTimelineItem, updateChecklistItem, updateTimelineItem } from "./crm-project-tools";
 import { DEFAULT_SMART_MESSAGES, insertMessageVariable, normalizeSmartMessages, renderSmartMessage, SMART_VARIABLES, type SmartMessage } from "./crm-smart-messages";
-import { Modal } from "./crm-ui";
+import { Modal, SwipeActions, SWIPE_ACTIONS_WIDTH } from "./crm-ui";
 
-const ACTION_WIDTH = 178;
 const SMART_MESSAGES_STORAGE_KEY = "fotocrm:smart-messages:v1";
 
 function time(value: string) { return new Date(value).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }); }
@@ -58,21 +57,21 @@ function ProjectSwipeRow({ open, showHint, onOpenChange, onEdit, onDelete, child
   const [dragX, setDragX] = useState<number | null>(null);
   const [consumeSwipe, setConsumeSwipe] = useState(false);
   const gesture = useRef<{ id: number; x: number; y: number; horizontal: boolean | null } | null>(null);
-  const restingX = open ? -ACTION_WIDTH : showHint ? -42 : 0;
+  const restingX = open ? -SWIPE_ACTIONS_WIDTH : showHint ? -42 : 0;
   function pointerDown(event: PointerEvent<HTMLElement>) { if (event.pointerType === "mouse" && event.button !== 0) return; gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, horizontal: null }; event.currentTarget.setPointerCapture(event.pointerId); }
   function pointerMove(event: PointerEvent<HTMLElement>) {
     const current = gesture.current; if (!current || current.id !== event.pointerId) return;
     const dx = event.clientX - current.x; const dy = event.clientY - current.y;
     if (current.horizontal === null && Math.max(Math.abs(dx), Math.abs(dy)) > 8) current.horizontal = Math.abs(dx) > Math.abs(dy);
     if (!current.horizontal) return;
-    setConsumeSwipe(true); setDragX(Math.min(0, Math.max(-ACTION_WIDTH - 18, (open ? -ACTION_WIDTH : 0) + dx)));
+    setConsumeSwipe(true); setDragX(Math.min(0, Math.max(-SWIPE_ACTIONS_WIDTH - 18, (open ? -SWIPE_ACTIONS_WIDTH : 0) + dx)));
   }
   function finishPointer(event: PointerEvent<HTMLElement>) {
     const current = gesture.current; if (!current || current.id !== event.pointerId) return;
-    if (current.horizontal) { const dx = event.clientX - current.x; onOpenChange(dx < -48 || (dragX !== null && dragX < -ACTION_WIDTH / 2)); }
+    if (current.horizontal) { const dx = event.clientX - current.x; onOpenChange(dx < -48 || (dragX !== null && dragX < -SWIPE_ACTIONS_WIDTH / 2)); }
     gesture.current = null; setDragX(null); window.requestAnimationFrame(() => { setConsumeSwipe(false); });
   }
-  return <div className="project-swipe-shell"><div className="project-swipe-actions" aria-hidden={!open}><button type="button" className="project-swipe-edit" onClick={onEdit} tabIndex={open ? 0 : -1}>Изменить</button><button type="button" className="project-swipe-delete" onClick={onDelete} tabIndex={open ? 0 : -1}>Удалить</button></div><div className={`project-swipe-surface${showHint ? " swipe-hint" : ""}`} style={{ transform: `translateX(${dragX ?? restingX}px)` }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer}>{children(consumeSwipe)}</div></div>;
+  return <div className="project-swipe-shell"><SwipeActions open={open} onEdit={onEdit} onDelete={onDelete} /><div className={`project-swipe-surface${showHint ? " swipe-hint" : ""}`} style={{ transform: `translateX(${dragX ?? restingX}px)` }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer}>{children(consumeSwipe)}</div></div>;
 }
 
 function TimelineManager({ items, onChange }: { items: unknown; onChange: (next: TimelineItem[]) => void }) {

@@ -41,8 +41,7 @@ test("timeline supports safe normalization, add, edit and delete", () => {
   assert.deepEqual(removeTimelineItem(changed, "arrival"), []);
   assert.match(dayMode, /input type="time"/);
   assert.match(dayMode, /\+ Добавить этап/);
-  assert.match(dayMode, /Изменить/);
-  assert.match(dayMode, /Удалить/);
+  assert.match(dayMode, /<SwipeActions open=\{open\} onEdit=\{onEdit\} onDelete=\{onDelete\}/);
 });
 
 test("equipment accepts an intentional empty list and supports checklist CRUD", () => {
