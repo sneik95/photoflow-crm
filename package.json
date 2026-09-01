@@ -17,6 +17,7 @@
     "test:clients": "node --test tests/crm-clients.test.ts",
     "test:finance": "node --test tests/crm-finance.test.ts",
     "test:settings": "node --test tests/crm-settings.test.ts",
+    "test:profile": "node --test tests/crm-profile.test.ts",
     "test:shooting": "node --test tests/crm-shooting-mode.test.ts",
     "test:audit": "node --test tests/crm-final-audit.test.ts",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",

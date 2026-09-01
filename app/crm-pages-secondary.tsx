@@ -1,9 +1,12 @@
 "use client";
 
 import {
+  ChangeEvent,
   Dispatch,
   FormEvent,
+  PointerEvent as ReactPointerEvent,
   SetStateAction,
+  useRef,
   useState,
 } from "react";
 import type { Client, Shoot, ShootType } from "./crm-data";
@@ -33,12 +36,27 @@ import {
 import {
   Field,
   Icon,
+  Modal,
   PageHeader,
   SwipeActions,
   ToggleRow,
   useOneTimeSwipeHint,
   useSwipeGesture,
 } from "./crm-ui";
+import {
+  AVATAR_CROP_SIZE,
+  AVATAR_OUTPUT_SIZE,
+  clampAvatarOffset,
+  type AvatarOffset,
+} from "./crm-avatar";
+
+type AvatarCropSource = {
+  url: string;
+  image: HTMLImageElement;
+  width: number;
+  height: number;
+};
+
 
 export function FinancePage({ shoots }: { shoots: Shoot[] }) {
   const now = new Date();
@@ -713,6 +731,144 @@ export type ProfileData = {
   goal: string;
 };
 
+function AvatarCropModal({
+  source,
+  onCancel,
+  onConfirm,
+}: {
+  source: AvatarCropSource;
+  onCancel: () => void;
+  onConfirm: (avatar: string) => void;
+}) {
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState<AvatarOffset>({ x: 0, y: 0 });
+  const gesture = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    offset: AvatarOffset;
+  } | null>(null);
+  const baseScale = Math.max(
+    AVATAR_CROP_SIZE / source.width,
+    AVATAR_CROP_SIZE / source.height,
+  );
+  const imageWidth = source.width * baseScale * zoom;
+  const imageHeight = source.height * baseScale * zoom;
+
+  function updateZoom(nextZoom: number) {
+    setZoom(nextZoom);
+    setOffset((current) => clampAvatarOffset(current, source, nextZoom));
+  }
+
+  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    gesture.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      offset,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const current = gesture.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    setOffset(
+      clampAvatarOffset(
+        {
+          x: current.offset.x + event.clientX - current.x,
+          y: current.offset.y + event.clientY - current.y,
+        },
+        source,
+        zoom,
+      ),
+    );
+  }
+
+  function finishPointer(event: ReactPointerEvent<HTMLDivElement>) {
+    if (gesture.current?.pointerId === event.pointerId) gesture.current = null;
+  }
+
+  function confirmCrop() {
+    const canvas = document.createElement("canvas");
+    canvas.width = AVATAR_OUTPUT_SIZE;
+    canvas.height = AVATAR_OUTPUT_SIZE;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+
+    const renderedScale = baseScale * zoom;
+    const imageLeft = (AVATAR_CROP_SIZE - imageWidth) / 2 + offset.x;
+    const imageTop = (AVATAR_CROP_SIZE - imageHeight) / 2 + offset.y;
+    const sourceWidth = AVATAR_CROP_SIZE / renderedScale;
+    const sourceHeight = AVATAR_CROP_SIZE / renderedScale;
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE);
+    context.drawImage(
+      source.image,
+      -imageLeft / renderedScale,
+      -imageTop / renderedScale,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      AVATAR_OUTPUT_SIZE,
+      AVATAR_OUTPUT_SIZE,
+    );
+    onConfirm(canvas.toDataURL("image/jpeg", 0.86));
+  }
+
+  return (
+    <Modal title="Кадрировать фото" onClose={onCancel} fullScreen viewportAware>
+      <div className="avatar-crop-modal">
+        <p>Переместите фото, чтобы выбрать область для аватара.</p>
+        <div
+          className="avatar-crop-stage"
+          role="presentation"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={finishPointer}
+          onPointerCancel={finishPointer}
+        >
+          <img
+            src={source.url}
+            alt="Предпросмотр кадрирования"
+            draggable={false}
+            style={{
+              width: imageWidth,
+              height: imageHeight,
+              left: (AVATAR_CROP_SIZE - imageWidth) / 2 + offset.x,
+              top: (AVATAR_CROP_SIZE - imageHeight) / 2 + offset.y,
+            }}
+          />
+          <span className="avatar-crop-ring" aria-hidden="true" />
+        </div>
+        <label className="avatar-crop-zoom">
+          <span>Масштаб</span>
+          <input
+            type="range"
+            min="1"
+            max="3"
+            step="0.01"
+            value={zoom}
+            onChange={(event) => updateZoom(Number(event.target.value))}
+            aria-label="Масштаб фото"
+          />
+        </label>
+        <div className="avatar-crop-actions">
+          <button type="button" className="button secondary" onClick={onCancel}>
+            Отмена
+          </button>
+          <button type="button" className="button primary" onClick={confirmCrop}>
+            Сохранить фото
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function ProfilePage({
   notify,
   initialProfile,
@@ -732,6 +888,50 @@ export function ProfilePage({
       goal: "2500000",
     },
   );
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [cropSource, setCropSource] = useState<AvatarCropSource | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
+
+  function closeCrop() {
+    if (cropSource) URL.revokeObjectURL(cropSource.url);
+    setCropSource(null);
+  }
+
+  function openPhotoPicker() {
+    photoInput.current?.click();
+  }
+
+  function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/") || !URL.createObjectURL) {
+      notify("Не удалось открыть выбранное изображение");
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      setCropSource({
+        url,
+        image,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      notify("Не удалось открыть выбранное изображение");
+    };
+    image.src = url;
+  }
+
+  function saveAvatar(nextAvatar: string) {
+    setAvatar(nextAvatar);
+    closeCrop();
+    notify("Фото профиля сохранено");
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -743,14 +943,41 @@ export function ProfilePage({
     <section className="page">
       <PageHeader title="Профиль" subtitle="Настройки аккаунта" />
       <div className="profile-card panel">
-        <span className="avatar large">
-          {profile.firstName[0]}{profile.lastName[0]}
-        </span>
+        <button
+          type="button"
+          className="profile-avatar-button"
+          onClick={openPhotoPicker}
+          aria-label="Выбрать фото профиля"
+        >
+          {avatar ? (
+            <img className="avatar large profile-avatar-image" src={avatar} alt="Фото профиля" />
+          ) : (
+            <span className="avatar large">
+              {profile.firstName[0]}{profile.lastName[0]}
+            </span>
+          )}
+          <span>Изменить фото</span>
+        </button>
+        <input
+          ref={photoInput}
+          className="profile-photo-input"
+          type="file"
+          accept="image/*"
+          onChange={selectPhoto}
+          tabIndex={-1}
+        />
         <div>
           <h2>{profile.firstName} {profile.lastName}</h2>
           <p>{profile.email}</p>
         </div>
       </div>
+      {cropSource && (
+        <AvatarCropModal
+          source={cropSource}
+          onCancel={closeCrop}
+          onConfirm={saveAvatar}
+        />
+      )}
       <form className="panel profile-form" onSubmit={submit}>
         <h2>Данные</h2>
         <div className="form-grid">

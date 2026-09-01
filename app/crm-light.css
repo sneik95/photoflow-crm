@@ -908,6 +908,46 @@ fieldset legend { color: var(--pf-muted); }
 .profile-form,
 .subscription,
 .referral { background: #fff; }
+.profile-avatar-button {
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pf-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.profile-avatar-button:focus-visible { border-radius: 16px; outline: 3px solid rgba(82,103,255,.25); outline-offset: 4px; }
+.profile-avatar-button .avatar { transition: transform .18s ease, box-shadow .18s ease; }
+.profile-avatar-button:active .avatar { transform: scale(.96); }
+.profile-avatar-image { display: block; object-fit: cover; background: #fff; }
+.profile-photo-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.avatar-crop-modal { display: grid; gap: 22px; padding: 12px 24px max(28px, calc(env(safe-area-inset-bottom) + 16px)); }
+.avatar-crop-modal > p { margin: 0; color: var(--pf-muted); font-size: 14px; line-height: 1.45; text-align: center; }
+.avatar-crop-stage {
+  position: relative;
+  width: 272px;
+  aspect-ratio: 1;
+  justify-self: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #e9e7e1;
+  box-shadow: 0 14px 36px rgba(23,25,31,.16);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.avatar-crop-stage img { position: absolute; max-width: none; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.avatar-crop-ring { position: absolute; inset: 0; border: 2px solid rgba(255,255,255,.92); border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(23,25,31,.14); pointer-events: none; }
+.avatar-crop-zoom { display: grid; gap: 9px; color: var(--pf-muted); font-size: 13px; }
+.avatar-crop-zoom input { width: 100%; accent-color: var(--pf-accent); }
+.avatar-crop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.avatar-crop-actions .button { min-height: 48px; }
 .referral { border-color: rgba(82,103,255,.2); }
 .referral > span { color: var(--pf-accent); }
 
