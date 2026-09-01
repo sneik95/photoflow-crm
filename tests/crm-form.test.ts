@@ -14,12 +14,17 @@ const validDraft: NewShootDraft = {
   price: "25000",
   paymentType: "postpay",
   advance: "",
+  start: "10:00",
+  end: "12:00",
 };
 
 test("new shoot validates every required base field", () => {
   assert.deepEqual(validateNewShoot({ ...validDraft, clientName: "" }), ["clientName"]);
   assert.deepEqual(validateNewShoot({ ...validDraft, clientPhone: "" }), ["clientPhone"]);
   assert.deepEqual(validateNewShoot({ ...validDraft, location: "" }), ["location"]);
+  assert.deepEqual(validateNewShoot({ ...validDraft, start: "" }), ["start"]);
+  assert.deepEqual(validateNewShoot({ ...validDraft, end: "" }), ["end"]);
+  assert.deepEqual(validateNewShoot({ ...validDraft, end: "09:59" }), ["end"]);
   assert.deepEqual(validateNewShoot({ ...validDraft, price: "" }), ["price"]);
 });
 
@@ -54,9 +59,20 @@ test("new shoot form keeps the required source-level UX contract", () => {
   const lightCss = readFileSync(new URL("../app/crm-light.css", import.meta.url), "utf8");
 
   assert.match(modal, /placeholder="Иванов Иван Иванович"/);
-  assert.match(modal, /placeholder="Например, 25 000"/);
-  assert.match(modal, /placeholder="Например, 5 000"/);
-  assert.match(modal, /placeholder="Например, 30"/);
+  const newShootModal = modal.slice(modal.indexOf("export function NewShootModal"));
+  assert.doesNotMatch(newShootModal, /Например,/);
+  assert.match(newShootModal, /placeholder="25 000"/);
+  assert.match(newShootModal, /placeholder="5 000"/);
+  assert.match(newShootModal, /placeholder="30"/);
+  assert.match(newShootModal, /const \[start, setStart\] = useState\(""\)/);
+  assert.match(newShootModal, /const \[end, setEnd\] = useState\(""\)/);
+  assert.match(newShootModal, /placeholder="10:00"/);
+  assert.match(newShootModal, /placeholder="12:00"/);
+  assert.match(newShootModal, /inputRefs\.current\.start/);
+  assert.match(newShootModal, /inputRefs\.current\.end/);
+  assert.match(newShootModal, /const \[editingHours, setEditingHours\] = useState\(""\)/);
+  assert.match(newShootModal, /const \[travelCost, setTravelCost\] = useState\(""\)/);
+  assert.match(newShootModal, /const \[otherCosts, setOtherCosts\] = useState\(""\)/);
   assert.doesNotMatch(modal, /Умное распознавание/);
   assert.doesNotMatch(modal, /Весь день/);
   assert.doesNotMatch(modal, /Указать стоимость/);

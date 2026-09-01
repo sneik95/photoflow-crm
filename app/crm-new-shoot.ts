@@ -5,7 +5,9 @@ export type NewShootField =
   | "clientPhone"
   | "location"
   | "price"
-  | "advance";
+  | "advance"
+  | "start"
+  | "end";
 
 export type NewShootDraft = {
   clientName: string;
@@ -14,6 +16,8 @@ export type NewShootDraft = {
   price: string;
   paymentType: "advance" | "full" | "postpay";
   advance: string;
+  start: string;
+  end: string;
 };
 
 export const NEW_SHOOT_REQUIRED_MESSAGE =
@@ -24,11 +28,17 @@ function isPositiveAmount(value: string) {
   return Number.isFinite(amount) && amount > 0;
 }
 
+function isTimeValue(value: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
 export function validateNewShoot(draft: NewShootDraft): NewShootField[] {
   const invalid: NewShootField[] = [];
   if (!draft.clientName.trim()) invalid.push("clientName");
   if (!draft.clientPhone.trim()) invalid.push("clientPhone");
   if (!draft.location.trim()) invalid.push("location");
+  if (!isTimeValue(draft.start)) invalid.push("start");
+  if (!isTimeValue(draft.end) || draft.end <= draft.start) invalid.push("end");
   if (!isPositiveAmount(draft.price)) invalid.push("price");
   if (draft.paymentType === "advance" && !isPositiveAmount(draft.advance)) {
     invalid.push("advance");

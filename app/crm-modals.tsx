@@ -224,17 +224,17 @@ export function NewShootModal({
   const now = new Date();
   const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const [date, setDate] = useState(initialDate || localToday);
-  const [start, setStart] = useState("10:00");
-  const [end, setEnd] = useState("12:00");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
   const [typeName, setTypeName] = useState(types[0]?.name || "Свадьба");
   const [comment, setComment] = useState("");
   const [location, setLocation] = useState("");
   const [travelMinutes, setTravelMinutes] = useState("");
   const [organizerName, setOrganizerName] = useState("");
   const [organizerPhone, setOrganizerPhone] = useState("");
-  const [editingHours, setEditingHours] = useState("6");
-  const [travelCost, setTravelCost] = useState("0");
-  const [otherCosts, setOtherCosts] = useState("0");
+  const [editingHours, setEditingHours] = useState("");
+  const [travelCost, setTravelCost] = useState("");
+  const [otherCosts, setOtherCosts] = useState("");
   const [clientGuide, setClientGuide] = useState("");
   const [price, setPrice] = useState("");
   const [paymentType, setPaymentType] =
@@ -287,6 +287,8 @@ export function NewShootModal({
       price,
       paymentType,
       advance: paid,
+      start,
+      end,
     });
     if (invalidFields.length) {
       setErrors(
@@ -440,18 +442,35 @@ export function NewShootModal({
               onChange={(event) => setDate(event.target.value)}
             />
           </Field>
-          <Field label="Начало">
+          <Field label="Начало *" invalid={errors.start}>
             <input
               type="time"
+              required
               value={start}
-              onChange={(event) => setStart(event.target.value)}
+              onChange={(event) => {
+                setStart(event.target.value);
+                clearError("start");
+                clearError("end");
+              }}
+              ref={(node) => {
+                inputRefs.current.start = node || undefined;
+              }}
+              placeholder="10:00"
             />
           </Field>
-          <Field label="Конец">
+          <Field label="Конец *" invalid={errors.end}>
             <input
               type="time"
+              required
               value={end}
-              onChange={(event) => setEnd(event.target.value)}
+              onChange={(event) => {
+                setEnd(event.target.value);
+                clearError("end");
+              }}
+              ref={(node) => {
+                inputRefs.current.end = node || undefined;
+              }}
+              placeholder="12:00"
             />
           </Field>
         </div>
@@ -492,7 +511,7 @@ export function NewShootModal({
               min="0"
               value={travelMinutes}
               onChange={(event) => setTravelMinutes(event.target.value)}
-              placeholder="Например, 30"
+              placeholder="30"
             />
           </Field>
         </div>
@@ -524,13 +543,13 @@ export function NewShootModal({
           <summary>Экономика и подготовка клиента</summary>
           <div className="form-grid triple-grid">
             <Field label="Часов на обработку">
-              <input type="number" min="0" value={editingHours} onChange={(event) => setEditingHours(event.target.value)} />
+              <input type="number" inputMode="numeric" min="0" value={editingHours} onChange={(event) => setEditingHours(event.target.value)} placeholder="6" />
             </Field>
             <Field label="Расходы на дорогу">
-              <input type="number" min="0" value={travelCost} onChange={(event) => setTravelCost(event.target.value)} />
+              <input type="number" inputMode="numeric" min="0" value={travelCost} onChange={(event) => setTravelCost(event.target.value)} placeholder="0" />
             </Field>
             <Field label="Прочие расходы">
-              <input type="number" min="0" value={otherCosts} onChange={(event) => setOtherCosts(event.target.value)} />
+              <input type="number" inputMode="numeric" min="0" value={otherCosts} onChange={(event) => setOtherCosts(event.target.value)} placeholder="0" />
             </Field>
           </div>
           <Field label="Что увидит клиент в памятке">
@@ -556,7 +575,7 @@ export function NewShootModal({
             ref={(node) => {
               inputRefs.current.price = node || undefined;
             }}
-            placeholder="Например, 25 000"
+            placeholder="25 000"
             enterKeyHint={paymentType === "advance" ? "next" : "done"}
           />
         </Field>
@@ -597,7 +616,7 @@ export function NewShootModal({
               ref={(node) => {
                 inputRefs.current.advance = node || undefined;
               }}
-              placeholder="Например, 5 000"
+              placeholder="5 000"
               enterKeyHint="done"
             />
           </Field>
