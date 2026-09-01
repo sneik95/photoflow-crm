@@ -1,3 +1,4 @@
+export const PROFILE_AVATAR_STORAGE_KEY = "photoflow.profile.avatar";
 export const AVATAR_CROP_SIZE = 272;
 export const AVATAR_OUTPUT_SIZE = 512;
 

@@ -47,6 +47,7 @@ import {
   AVATAR_CROP_SIZE,
   AVATAR_OUTPUT_SIZE,
   clampAvatarOffset,
+  PROFILE_AVATAR_STORAGE_KEY,
   type AvatarOffset,
 } from "./crm-avatar";
 
@@ -888,7 +889,14 @@ export function ProfilePage({
       goal: "2500000",
     },
   );
-  const [avatar, setAvatar] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return window.localStorage.getItem(PROFILE_AVATAR_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
   const [cropSource, setCropSource] = useState<AvatarCropSource | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
 
@@ -928,9 +936,14 @@ export function ProfilePage({
   }
 
   function saveAvatar(nextAvatar: string) {
-    setAvatar(nextAvatar);
-    closeCrop();
-    notify("Фото профиля сохранено");
+    try {
+      window.localStorage.setItem(PROFILE_AVATAR_STORAGE_KEY, nextAvatar);
+      setAvatar(nextAvatar);
+      closeCrop();
+      notify("Фото профиля сохранено");
+    } catch {
+      notify("Не удалось сохранить фото профиля");
+    }
   }
 
   function submit(event: FormEvent) {

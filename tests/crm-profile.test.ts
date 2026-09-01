@@ -32,6 +32,8 @@ test("profile source uses an explicit picker, cancellable crop and optimized ava
   assert.match(page, /onPointerDown=\{onPointerDown\}/);
   assert.match(page, /onPointerMove=\{onPointerMove\}/);
   assert.match(page, /canvas\.toDataURL\("image\/jpeg", 0\.86\)/);
+  assert.match(page, /window\.localStorage\.getItem\(PROFILE_AVATAR_STORAGE_KEY\)/);
+  assert.match(page, /window\.localStorage\.setItem\(PROFILE_AVATAR_STORAGE_KEY, nextAvatar\)/);
   assert.match(css, /\.avatar-crop-stage[\s\S]*?border-radius: 50%;[\s\S]*?touch-action: none;/);
   assert.match(css, /\.profile-avatar-image[\s\S]*?object-fit: cover;/);
 });
