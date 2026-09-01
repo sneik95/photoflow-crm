@@ -28,7 +28,7 @@ import {
   positiveWholeNumber,
   reminderDaysLabel,
   removeShootType,
-  storedDeliveryReminderDays,
+  russianDays,
 } from "./crm-settings";
 import {
   Field,
@@ -388,6 +388,9 @@ export function SettingsPage({
   const [deliveryReminder, setDeliveryReminder] = useState(() =>
     deliveryReminderSetting(initialDeliveryReminderDays),
   );
+  const [reminderDaysInput, setReminderDaysInput] = useState(() =>
+    String(deliveryReminderSetting(initialDeliveryReminderDays).days),
+  );
   const [googleHelp, setGoogleHelp] = useState(false);
   const [openSwipe, setOpenSwipe] = useState<number | null>(null);
   const [editing, setEditing] = useState<TypeEditState>(null);
@@ -396,7 +399,19 @@ export function SettingsPage({
     types.length > 0,
   );
 
-  const deliveryReminderDays = storedDeliveryReminderDays(deliveryReminder);
+  const reminderDraftDays = positiveWholeNumber(
+    reminderDaysInput,
+    deliveryReminder.days,
+  );
+  const deliveryReminderDays = deliveryReminder.enabled
+    ? reminderDraftDays
+    : 0;
+
+  function commitReminderDaysInput() {
+    const days = positiveWholeNumber(reminderDaysInput, deliveryReminder.days);
+    setDeliveryReminder((current) => ({ ...current, days }));
+    setReminderDaysInput(String(days));
+  }
 
   async function persist(nextTypes = types, nextDeliveryDays = deliveryReminderDays) {
     const result = await onSave?.(nextTypes, reminders, nextDeliveryDays);
@@ -642,15 +657,11 @@ export function SettingsPage({
                 min="1"
                 step="1"
                 disabled={!deliveryReminder.enabled}
-                value={deliveryReminder.days}
-                onChange={(event) => {
-                  const days = positiveWholeNumber(event.target.value, 0);
-                  if (days > 0) {
-                    setDeliveryReminder((current) => ({ ...current, days }));
-                  }
-                }}
+                value={reminderDaysInput}
+                onChange={(event) => setReminderDaysInput(event.target.value)}
+                onBlur={commitReminderDaysInput}
               />
-              <span>{reminderDaysLabel(deliveryReminder.days).replace(/^\d+\s/, "")}</span>
+              <span>{russianDays(reminderDraftDays)}</span>
               <span>до срока сдачи</span>
             </label>
           </div>

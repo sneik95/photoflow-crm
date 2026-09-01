@@ -35,6 +35,8 @@ test("delivery reminder keeps a positive value only while enabled", () => {
   assert.equal(storedDeliveryReminderDays({ enabled: true, days: 3 }), 3);
   assert.equal(storedDeliveryReminderDays({ enabled: false, days: 3 }), 0);
   assert.equal(storedDeliveryReminderDays({ enabled: true, days: 0 }), 1);
+  assert.equal(positiveWholeNumber("", 12), 12);
+  assert.equal(positiveWholeNumber("3", 12), 3);
 });
 
 test("Russian day declension covers required values", () => {
@@ -60,6 +62,12 @@ test("settings source keeps swipe actions, confirmation and iPhone input contrac
   assert.match(page, /window\.confirm/);
   assert.match(page, /didSwipe\.current/);
   assert.match(page, /delivery-reminder-input/);
+  assert.match(page, /const \[reminderDaysInput, setReminderDaysInput\] = useState/);
+  assert.match(page, /value=\{reminderDaysInput\}/);
+  assert.match(page, /onChange=\{\(event\) => setReminderDaysInput\(event\.target\.value\)\}/);
+  assert.match(page, /onBlur=\{commitReminderDaysInput\}/);
+  assert.match(page, /setReminderDaysInput\(String\(days\)\)/);
+  assert.match(page, /russianDays\(reminderDraftDays\)/);
   assert.doesNotMatch(page, /Письмо за 1 день до дедлайна/);
   assert.doesNotMatch(page, /Показывать средний чек/);
   assert.match(css, /\.delivery-reminder-input[\s\S]*?font-size: 16px;/);
